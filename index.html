@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DocBook — دخول الممرضة</title>
+
+  <!-- نفس خطوط دوكبوك -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+
+  <!-- PWA: هوية وأيقونة العيادة (تمنع تبنّي هوية أي تطبيق آخر على نفس النطاق) -->
+  <link rel="manifest" href="manifest.json"/>
+  <meta name="theme-color" content="#0d9488"/>
+  <link rel="apple-touch-icon" sizes="192x192" href="icon-192.png"/>
+
+  <!-- PWA: تسجيل service worker (شبكة-أولاً) — مطلوب لتثبيت التطبيق على أندرويد كتطبيق كامل -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('sw.js').catch(function () {});
+      });
+    }
+  </script>
+
+  <style>
+    :root {
+      --primary:       #0d9488;
+      --primary-dark:  #0f766e;
+      --primary-light: #14b8a6;
+      --cream:         #f3ede1;
+      --cream-2:       #efe7d8;
+      --ink:           #1f2937;
+      --ink-soft:      #6b7280;
+      --field-border:  #e7ddc9;
+    }
+
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      margin: 0;
+      font-family: 'Tajawal', 'IBM Plex Sans Arabic', sans-serif;
+      color: var(--ink);
+      background: var(--cream);
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .auth-wrap { display: flex; min-height: 100vh; width: 100%; }
+
+    /* ===== لوحة الوسائط (يمين) — جاهزة لفيديو أو صورة ===== */
+    .auth-media {
+      flex: 1 1 50%;
+      position: relative;
+      overflow: hidden;
+      background: linear-gradient(135deg, #0d9488 0%, #14b8a6 55%, #2dd4bf 100%);
+    }
+    .auth-media-bg {
+      position: absolute; inset: 0;
+      width: 100%; height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+    .auth-media-overlay {
+      position: absolute; inset: 0;
+      background: linear-gradient(180deg, rgba(13,148,136,.22) 0%, rgba(15,118,110,.42) 100%);
+    }
+    .auth-brand-badge {
+      position: absolute; top: 26px; left: 30px; z-index: 2;
+      width: 56px; height: 56px; border-radius: 16px;
+      background: rgba(255,255,255,.18); border: 1.5px solid rgba(255,255,255,.35);
+      display: flex; align-items: center; justify-content: center; overflow: hidden;
+      color: #fff; font-size: 1.4rem; backdrop-filter: blur(4px);
+    }
+    .auth-brand-badge img { width: 100%; height: 100%; object-fit: cover; }
+    .auth-dots { position: absolute; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 2; display: flex; gap: 9px; }
+    .auth-dots span { width: 9px; height: 9px; border-radius: 50%; background: rgba(255,255,255,.5); transition: all .25s; }
+    .auth-dots span.active { width: 26px; border-radius: 6px; background: #fff; }
+
+    /* ===== لوحة النموذج (يسار) ===== */
+    .auth-form {
+      flex: 1 1 50%; display: flex; align-items: center; justify-content: center;
+      padding: 40px 24px; background: #fff;
+    }
+    .auth-card { width: 100%; max-width: 420px; }
+
+    .brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 30px; }
+    .brand-logo {
+      width: 76px; height: 76px; border-radius: 20px; overflow: hidden;
+      display: flex; align-items: center; justify-content: center;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      box-shadow: 0 12px 30px rgba(13,148,136,.28); color: #fff; font-size: 2rem;
+    }
+    .brand-logo img { width: 100%; height: 100%; object-fit: cover; }
+    .brand-name { font-size: 1.7rem; font-weight: 800; color: var(--ink); letter-spacing: .3px; }
+
+    .auth-title { font-size: 1.9rem; font-weight: 800; margin: 0 0 10px; color: #111827; letter-spacing: -.5px; text-align: center; }
+    .auth-sub   { font-size: .98rem; color: var(--ink-soft); margin: 0 0 28px; font-weight: 500; text-align: center; }
+
+    .btn-google {
+      width: 100%; display: flex; align-items: center; justify-content: center; gap: 12px;
+      background: #fff; border: 1.5px solid var(--field-border); border-radius: 14px; padding: 16px 18px;
+      font-family: inherit; font-size: 1.02rem; font-weight: 700; color: var(--ink); cursor: pointer;
+      box-shadow: 0 4px 14px rgba(0,0,0,.05); transition: border-color .15s, box-shadow .15s, transform .12s;
+    }
+    .btn-google:hover { border-color: #c9bb9c; box-shadow: 0 8px 22px rgba(0,0,0,.1); }
+    .btn-google:active { transform: scale(.99); }
+    .btn-google:disabled { opacity: .7; cursor: default; }
+    .btn-google svg { width: 22px; height: 22px; flex-shrink: 0; }
+
+    .auth-msg { display: none; margin: 0 0 18px; padding: 12px 14px; border-radius: 12px; font-size: .88rem; font-weight: 600; text-align: center; }
+    .auth-msg.error { display: block; background: #fee2e2; color: #b91c1c; }
+    .auth-msg.info  { display: block; background: #ccfbf1; color: #0f766e; }
+
+    .auth-footer { display: flex; align-items: center; justify-content: space-between; margin-top: 40px; font-size: .82rem; color: var(--ink-soft); font-weight: 500; }
+    .auth-footer .links { display: flex; gap: 18px; }
+    .auth-footer a { color: var(--ink-soft); text-decoration: none; }
+    .auth-footer a:hover { color: var(--primary); }
+
+    .spin { width: 18px; height: 18px; border: 2.5px solid rgba(13,148,136,.3); border-top-color: var(--primary); border-radius: 50%; animation: spin .7s linear infinite; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    @keyframes nawwa-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+    .ecg-container { width: 260px; margin: 0 auto 22px; }
+    .ecg-container svg { width: 100%; height: 44px; overflow: visible; }
+    .ecg-path {
+      fill: none; stroke: var(--primary); stroke-width: 2.2;
+      stroke-linecap: round; stroke-linejoin: round;
+      stroke-dasharray: 100; stroke-dashoffset: 100;
+      animation: ecg-draw 2.4s ease-out infinite;
+      filter: drop-shadow(0 0 4px rgba(13,148,136,.5));
+    }
+    @keyframes ecg-draw {
+      0%   { stroke-dashoffset: 100; opacity: 1; }
+      60%  { stroke-dashoffset: 0;   opacity: 1; }
+      80%  { stroke-dashoffset: 0;   opacity: .7; }
+      95%  { stroke-dashoffset: 0;   opacity: 0; }
+      100% { stroke-dashoffset: 100; opacity: 0; }
+    }
+
+    @media (max-width: 900px) {
+      /* الموبايل: الفيديو خلفية ملء الشاشة + بطاقة الدخول فوقه */
+      .auth-media { display: block; position: fixed; inset: 0; z-index: 0; flex: none; }
+      .auth-media .auth-dots, .auth-media .auth-brand-badge { display: none; }
+      .auth-form  { position: relative; z-index: 1; flex-basis: 100%; background: transparent; padding: 24px 18px; min-height: 100vh; }
+      .auth-card  { background: rgba(255,255,255,.93); backdrop-filter: blur(10px); border-radius: 24px; padding: 30px 22px; box-shadow: 0 20px 50px rgba(0,0,0,.28); }
+    }
+
+    /* ===== مودال سياسة الخصوصية ===== */
+    .privacy-overlay {
+      position: fixed; inset: 0; z-index: 200;
+      background: rgba(10,18,28,.68);
+      backdrop-filter: blur(7px);
+      display: flex; align-items: center; justify-content: center;
+      padding: 20px;
+      animation: fadeIn .2s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+    .privacy-card {
+      background: #fff; border-radius: 24px;
+      width: 100%; max-width: 580px; max-height: 88vh;
+      display: flex; flex-direction: column;
+      box-shadow: 0 32px 80px rgba(0,0,0,.28);
+      overflow: hidden;
+      animation: slideUp .28s cubic-bezier(.22,.61,.36,1);
+    }
+    @keyframes slideUp { from { opacity: 0; transform: translateY(22px); } to { opacity: 1; transform: translateY(0); } }
+
+    .privacy-head {
+      padding: 26px 26px 18px; border-bottom: 1px solid #f0ebe0;
+      text-align: center; flex-shrink: 0;
+    }
+    .privacy-head-logo { margin: 0 auto 14px; display: flex; justify-content: center; }
+    .privacy-head-logo img { max-width: 190px; height: auto; object-fit: contain; }
+    .privacy-head h2 { margin: 0 0 5px; font-size: 1.22rem; font-weight: 800; color: #111827; }
+    .privacy-head p  { margin: 0; font-size: .85rem; color: var(--ink-soft); font-weight: 500; }
+
+    .privacy-body {
+      flex: 1; overflow-y: auto; padding: 20px 24px; scroll-behavior: smooth;
+    }
+    .privacy-body::-webkit-scrollbar { width: 4px; }
+    .privacy-body::-webkit-scrollbar-track { background: #f3ede1; border-radius: 10px; }
+    .privacy-body::-webkit-scrollbar-thumb { background: var(--primary); border-radius: 10px; }
+
+    .p-clause {
+      margin-bottom: 13px; padding: 14px 16px;
+      background: #f9f6f0; border-radius: 14px;
+      border-right: 4px solid var(--primary);
+      cursor: pointer; transition: background .2s, border-color .2s;
+      user-select: none;
+    }
+    .p-clause:hover { background: #f3ede1; }
+    .p-clause.read { border-right-color: #10b981; background: #f0fdf8; }
+    .p-clause-title {
+      font-size: .91rem; font-weight: 800; color: var(--primary);
+      margin: 0; display: flex; align-items: center; gap: 8px;
+      justify-content: space-between;
+    }
+    .p-clause.read .p-clause-title { color: #059669; }
+    .p-clause-title::after { content: '▾'; font-size: .9rem; color: #9ca3af; transition: transform .25s; flex-shrink: 0; }
+    .p-clause.open .p-clause-title::after { transform: rotate(-180deg); }
+    .p-clause.read .p-clause-title::after { content: '✓'; color: #10b981; transform: none; }
+    .p-clause-num {
+      width: 22px; height: 22px; border-radius: 7px;
+      background: var(--primary); color: #fff;
+      font-size: .78rem; font-weight: 800;
+      display: inline-flex; align-items: center; justify-content: center; flex-shrink: 0;
+    }
+    .p-clause.read .p-clause-num { background: #10b981; }
+    .p-clause p {
+      margin: 0; font-size: .84rem; line-height: 1.82; color: #374151;
+      max-height: 0; overflow: hidden;
+      transition: max-height .35s ease, margin-top .2s ease;
+    }
+    .p-clause.open p { max-height: 500px; margin-top: 8px; }
+
+    .privacy-foot {
+      padding: 16px 24px 22px; border-top: 1px solid #f0ebe0;
+      background: #fafaf8; flex-shrink: 0;
+    }
+    .privacy-agree-row {
+      display: flex; align-items: flex-start; gap: 11px;
+      margin-bottom: 14px; cursor: pointer;
+    }
+    .privacy-agree-row input[type="checkbox"] {
+      width: 19px; height: 19px; flex-shrink: 0; margin-top: 3px;
+      accent-color: var(--primary); cursor: pointer;
+    }
+    .privacy-agree-row span { font-size: .88rem; font-weight: 600; color: #374151; line-height: 1.55; }
+
+    .privacy-btns { display: flex; gap: 10px; }
+    .btn-p-cancel {
+      flex: 1; padding: 12px; border-radius: 12px;
+      border: 1.5px solid var(--field-border); background: #fff;
+      font-family: inherit; font-size: .92rem; font-weight: 700; color: var(--ink-soft);
+      cursor: pointer; transition: border-color .15s, color .15s;
+    }
+    .btn-p-cancel:hover { border-color: #c9bb9c; color: var(--ink); }
+    .btn-p-accept {
+      flex: 2; padding: 12px; border-radius: 12px; border: none;
+      background: linear-gradient(135deg, var(--primary), var(--primary-light));
+      font-family: inherit; font-size: .92rem; font-weight: 800; color: #fff;
+      cursor: pointer; transition: opacity .15s, transform .1s;
+      box-shadow: 0 6px 18px rgba(13,148,136,.35);
+    }
+    .btn-p-accept:hover:not(:disabled) { opacity: .9; transform: translateY(-1px); }
+    .btn-p-accept:active:not(:disabled) { transform: scale(.98); }
+    .btn-p-accept:disabled { opacity: .4; cursor: default; box-shadow: none; transform: none; }
+
+    @media (max-width: 640px) {
+      .privacy-card { max-height: 95vh; border-radius: 20px; }
+      .privacy-head { padding: 18px 16px 14px; }
+      .privacy-body { padding: 14px 16px; }
+      .privacy-foot { padding: 12px 16px 18px; }
+    }
+  </style>
+</head>
+
+<body>
+  <div class="auth-wrap">
+
+    <!-- ===== لوحة الوسائط (يمين) — ضع فيديو media.mp4 أو صورة media.jpg داخل مجلد nurse ===== -->
+    <aside class="auth-media">
+      <video class="auth-media-bg" autoplay muted loop playsinline preload="auto" poster="media.jpg">
+        <source src="media.mp4" type="video/mp4" />
+      </video>
+      <!-- للصورة بدل الفيديو: احذف <video> أعلاه واستخدم هذا بدلاً منه:
+      <img class="auth-media-bg" src="media.jpg" alt="" onerror="this.style.display='none';" /> -->
+      <div class="auth-media-overlay"></div>
+    </aside>
+
+    <!-- ===== لوحة النموذج (يسار) ===== -->
+    <section class="auth-form">
+      <div class="auth-card">
+
+        <img src="brand-logo.png" alt="DocBook" style="display:block; margin:0 auto 20px; max-width:240px; height:auto;" />
+        <div class="ecg-container">
+          <svg viewBox="0 0 300 44" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none">
+            <path class="ecg-path" pathLength="100"
+              d="M0,22 L50,22 L58,19 L64,22 L74,22 L84,2 L90,42 L96,22 L104,30 L112,22 L300,22"/>
+          </svg>
+        </div>
+
+        <p class="auth-sub">سجّل الدخول للمتابعة إلى لوحة الممرضة.</p>
+
+        <div class="auth-msg" id="authMsg"></div>
+
+        <button class="btn-google" id="googleBtn" type="button">
+          <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg">
+            <path fill="#FFC107" d="M43.6 20.5H42V20H24v8h11.3c-1.6 4.7-6.1 8-11.3 8-6.6 0-12-5.4-12-12s5.4-12 12-12c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 4.1 29.6 2 24 2 11.8 2 2 11.8 2 24s9.8 22 22 22 22-9.8 22-22c0-1.3-.1-2.5-.4-3.5z"/>
+            <path fill="#FF3D00" d="M6.3 14.7l6.6 4.8C14.7 16 19 13 24 13c3.1 0 5.9 1.2 8 3.1l5.7-5.7C34.6 4.1 29.6 2 24 2 16 2 9.1 6.5 6.3 14.7z"/>
+            <path fill="#4CAF50" d="M24 46c5.5 0 10.5-2.1 14.3-5.6l-6.6-5.6C29.6 36.6 26.9 37.7 24 37.7c-5.2 0-9.6-3.3-11.3-7.9l-6.5 5C9.1 42.4 16 46 24 46z"/>
+            <path fill="#1976D2" d="M43.6 20.5H42V20H24v8h11.3c-.8 2.3-2.2 4.2-4.1 5.6l6.6 5.6C41.7 36.3 46 30.7 46 24c0-1.3-.1-2.5-.4-3.5z"/>
+          </svg>
+          <span id="googleBtnLabel">متابعة باستخدام جوجل</span>
+        </button>
+
+        <div class="auth-footer">
+          <span>© 2026 DocBook</span>
+          <a href="https://nawwacodes.online/?utm_source=ig&utm_medium=social&utm_content=link_in_bio&fbclid=PAZXh0bgNhZW0CMTEAc3J0YwZhcHBfaWQPNTY3MDY3MzQzMzUyNDI3AAGnUOnRKpKoNekgd8onemyFkKmQsYAv7Ra_tLvR_K6qdNIdh8H-5mntUjqhGWk_aem_PRA1BNF917HSUZO35ufhqg" target="_blank" rel="noopener" style="color:var(--ink-soft); text-decoration:none; font-weight:500; display:inline-flex; align-items:center; gap:5px;" onmouseover="this.style.color='var(--primary)'" onmouseout="this.style.color='var(--ink-soft)'"><img src="nawwa-logo.png" alt="" style="height:13px;width:auto;object-fit:contain;opacity:.75;border-radius:2px;animation:nawwa-spin 8s linear infinite;" onerror="this.style.display='none';">Nawaacodes</a>
+        </div>
+
+      </div>
+    </section>
+  </div>
+
+  <!-- ===== مودال سياسة الخصوصية ===== -->
+  <div id="privacyModal" class="privacy-overlay" style="display:none;" role="dialog" aria-modal="true" aria-labelledby="privacyModalTitle">
+    <div class="privacy-card">
+
+      <div class="privacy-head">
+        <div class="privacy-head-logo">
+          <img src="brand-logo.png" alt="DocBook" onerror="this.style.display='none';" />
+        </div>
+        <h2 id="privacyModalTitle">سياسة الخصوصية وشروط الاستخدام</h2>
+        <p>يرجى قراءة البنود التالية والموافقة عليها قبل المتابعة</p>
+      </div>
+
+      <div class="privacy-body">
+
+        <div class="p-clause">
+          <div class="p-clause-title"><span class="p-clause-num">١</span>إخلاء المسؤولية الطبية</div>
+          <p>تُقدّم منصة DocBook خدمات إدارية وتنظيمية بحتة، ولا تُعدّ بأي حال جهةً طبية أو داعمةً لاتخاذ قرارات علاجية. جميع القرارات الطبية تقع على عاتق الطبيب والكادر الصحي المرخّص حصراً. لا تتحمل الفريق المطور أي مسؤولية قانونية أو مدنية ناجمة عن أي ضرر طبي يصيب المريض، سواء أكان ذلك بسبب معلومات مُدخلة في النظام أم بعد استخدامه.</p>
+        </div>
+
+        <div class="p-clause">
+          <div class="p-clause-title"><span class="p-clause-num">٢</span>توزيع المسؤولية في معالجة البيانات</div>
+          <p>تعمل العيادة أو المنشأة الصحية بصفة "مالك البيانات" (Data Controller) وهي المسؤولة الوحيدة عن الحصول على موافقة المرضى وضمان مشروعية جمع بياناتهم ومعالجتها. أما الفريق المطور فتعمل بصفة "معالج البيانات" (Data Processor) فحسب، وتعالج البيانات بناءً على تعليمات العميل وفي حدود ما تقتضيه الخدمة.</p>
+        </div>
+
+        <div class="p-clause">
+          <div class="p-clause-title"><span class="p-clause-num">٣</span>مسؤولية العميل عن صحة الاستخدام</div>
+          <p>يتحمل العميل مسؤولية كاملة وحصرية عن دقة البيانات المُدخلة في النظام، وسلامة بيانات الوصول وعدم مشاركتها مع أطراف غير مصرّح لهم، والاستخدام المتوافق مع الأنظمة والقوانين المحلية النافذة. تنتفي أي مسؤولية على الفريق المطور في حال نشأ ضرر نتيجة بيانات خاطئة أو استخدام مخالف للشروط.</p>
+        </div>
+
+        <div class="p-clause">
+          <div class="p-clause-title"><span class="p-clause-num">٤</span>استقلالية قاعدة البيانات وانعدام صلاحيات الفريق المطور</div>
+          <p>تُبنى قاعدة بيانات النظام حصرياً على حساب Firebase / Google الخاص بالعميل (الطبيب أو المنشأة الصحية). لا تمتلك الفريق المطور أي بيانات اعتماد أو صلاحيات وصول إلى مشروع Firebase الخاص بالعميل، ولا تستطيع تقنياً ولا قانونياً الاطلاع على أي بيانات مُدخلة في النظام أو تعديلها أو حذفها أو تصديرها، بما فيها بيانات المرضى والمواعيد والإعدادات. يتحمل العميل وحده إدارة حساب Firebase الخاص به وضمان أمانه والحفاظ على سرية بيانات الاعتماد المرتبطة به.</p>
+        </div>
+
+      </div>
+
+      <div class="privacy-foot">
+        <p id="privacyProgress" style="margin:0 0 12px; font-size:.82rem; font-weight:600; color:#6b7280; text-align:center;">اضغط على كل بند لقراءته — (0 / 4)</p>
+        <label class="privacy-agree-row">
+          <input type="checkbox" id="agreeCheck" disabled />
+          <span>لقد قرأت جميع البنود وأوافق على سياسة الخصوصية وشروط الاستخدام الخاصة بـ DocBook</span>
+        </label>
+        <div class="privacy-btns">
+          <button class="btn-p-cancel" id="cancelPrivacyBtn" type="button">إلغاء</button>
+          <button class="btn-p-accept" id="acceptPrivacyBtn" type="button" disabled>أوافق وأكمل تسجيل الدخول</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- تشغيل فيديو الخلفية (بعض المتصفحات تحتاج نداء play صريح) -->
+  <script>(function(){var v=document.querySelector('video.auth-media-bg');if(v){v.muted=true;var p=v.play();if(p&&p.catch)p.catch(function(){});}})();</script>
+
+  <!-- إعدادات العميل (Firebase + الأدوار) -->
+  <script src="config.js"></script>
+
+  <!-- Firebase: دخول جوجل فقط -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged,
+             browserLocalPersistence, setPersistence, signOut }
+      from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+
+    const EXPECTED_ROLE = 'nurse';   // ← هذه صفحة دخول الممرضة
+    const APP_PAGE      = 'app.html';
+
+    const firebaseConfig = window.FIREBASE_CONFIG;   // ← يأتي من config.js (الملف الوحيد للتعديل)
+
+    const _app  = initializeApp(firebaseConfig);
+    const _auth = getAuth(_app);
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+
+    const msgEl = document.getElementById('authMsg');
+    const gBtn  = document.getElementById('googleBtn');
+    const gLabel = document.getElementById('googleBtnLabel');
+
+    function showMsg(text, type) { msgEl.textContent = text; msgEl.className = 'auth-msg ' + (type || 'info'); }
+    function clearMsg() { msgEl.className = 'auth-msg'; msgEl.textContent = ''; }
+    function rejectMsg(user) {
+      var email = (user && user.email) ? user.email : '—';
+      if (!window.DOCBOOK_ROLES) return 'تعذّر تحميل config.js — تأكّد من وجوده بجانب هذه الصفحة.';
+      return 'الحساب (' + email + ') غير مصرّح لهذه اللوحة. المسموح: ' + (window.DOCBOOK_ROLES.nurse || []).join('، ');
+    }
+
+    function handleUser(user) {
+      const role = (window.DOCBOOK_ROLE_OF ? window.DOCBOOK_ROLE_OF(user && user.email) : null);
+      if (role === EXPECTED_ROLE) { location.replace(APP_PAGE); return true; }
+      return false; // غير مصرّح لهذه اللوحة
+    }
+
+    onAuthStateChanged(_auth, function (user) {
+      if (user && !user.isAnonymous) {
+        if (!handleUser(user)) {
+          var m = rejectMsg(user);
+          signOut(_auth);
+          showMsg(m, 'error');
+        }
+      }
+    });
+
+    async function googleLogin() {
+      clearMsg();
+      gBtn.disabled = true;
+      gLabel.innerHTML = '<svg style="width:110px;height:24px;display:inline-block;vertical-align:middle" viewBox="0 0 300 44" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="none"><path class="ecg-path" pathLength="100" d="M0,22 L50,22 L58,19 L64,22 L74,22 L84,2 L90,42 L96,22 L104,30 L112,22 L300,22"/></svg>';
+      try {
+        await setPersistence(_auth, browserLocalPersistence);
+        const cred = await signInWithPopup(_auth, provider);
+        if (!handleUser(cred.user)) {
+          var m = rejectMsg(cred.user);
+          await signOut(_auth);
+          showMsg(m, 'error');
+        }
+      } catch (e) {
+        console.error('[google-login]', e && e.code, e && e.message);
+        if (e && e.code === 'auth/popup-closed-by-user') showMsg('تم إغلاق نافذة الدخول قبل الإكمال.', 'info');
+        else if (e && e.code === 'auth/unauthorized-domain') showMsg('النطاق غير مُصرّح في Firebase. أضِف نطاقك في Authentication → Settings → Authorized domains.', 'error');
+        else showMsg('تعذّر تسجيل الدخول: ' + ((e && e.code) || (e && e.message) || ''), 'error');
+      } finally {
+        gBtn.disabled = false;
+        gLabel.textContent = 'متابعة باستخدام جوجل';
+      }
+    }
+
+    const _PRIVACY_KEY = 'docbook_privacy_accepted_v1';
+
+    document.getElementById('agreeCheck').addEventListener('change', function () {
+      document.getElementById('acceptPrivacyBtn').disabled = !this.checked;
+    });
+
+    document.getElementById('cancelPrivacyBtn').addEventListener('click', function () {
+      document.getElementById('privacyModal').style.display = 'none';
+      document.getElementById('agreeCheck').checked = false;
+      document.getElementById('acceptPrivacyBtn').disabled = true;
+    });
+
+    document.getElementById('acceptPrivacyBtn').addEventListener('click', function () {
+      localStorage.setItem(_PRIVACY_KEY, new Date().toISOString());
+      document.getElementById('privacyModal').style.display = 'none';
+      googleLogin();
+    });
+
+    // Accordion — يجبر المستخدم على فتح كل بند قبل الموافقة
+    (function () {
+      var clauses    = document.querySelectorAll('.p-clause');
+      var readSet    = new Set();
+      var progressEl = document.getElementById('privacyProgress');
+      var agreeChk   = document.getElementById('agreeCheck');
+      var total      = clauses.length;
+
+      function updateProgress() {
+        var n = readSet.size;
+        if (progressEl) {
+          progressEl.textContent = n < total
+            ? 'اضغط على كل بند لقراءته — (' + n + ' / ' + total + ')'
+            : 'تمت قراءة جميع البنود ✓';
+          progressEl.style.color = n === total ? '#059669' : '#6b7280';
+        }
+        if (agreeChk) agreeChk.disabled = (n < total);
+      }
+
+      clauses.forEach(function (clause, i) {
+        clause.addEventListener('click', function () {
+          this.classList.toggle('open');
+          if (!readSet.has(i)) { readSet.add(i); this.classList.add('read'); updateProgress(); }
+        });
+      });
+    })();
+
+    gBtn.addEventListener('click', function () {
+      if (localStorage.getItem(_PRIVACY_KEY)) {
+        googleLogin();
+      } else {
+        document.getElementById('privacyModal').style.display = 'flex';
+      }
+    });
+  </script>
+</body>
+</html>

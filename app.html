@@ -1,0 +1,1851 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0,maximum-scale=1.0,user-scalable=yes" />
+  <title>DocBook — لوحة الممرضة</title>
+
+  <!-- Tailwind CDN with custom teal palette -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'primary-1': '#f0fdfa',
+            'primary-2': '#ccfbf1',
+            'primary-3': '#5eead4',
+            'primary-4': '#2dd4bf',
+            'primary-5': '#14b8a6',
+            'primary-6': '#0d9488',
+            'primary-7': '#0f766e',
+            'primary-8': '#115e59',
+            'primary-9': '#134e4a',
+            'primary-10': '#042f2e',
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@300;400;500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&family=DM+Mono:wght@400;500&family=Montserrat:wght@700;800&family=Roboto:wght@300;400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"/>
+  <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.min.js"></script>
+
+  <link rel="stylesheet" href="styles.css">
+
+  <!-- ═══════════════ PWA — DocBook ═══════════════ -->
+  <meta name="theme-color" content="#0d9488" />
+  <meta name="application-name" content="DocBook" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="DocBook" />
+  <meta name="mobile-web-app-capable" content="yes" />
+  <meta name="msapplication-TileColor" content="#0d9488" />
+  <meta name="description" content="DocBook — نظام حجز المواعيد الطبية | لوحة الممرضة" />
+  
+  
+  <!-- ════════════════════════════════════════════ -->
+
+
+  <link rel="apple-touch-icon" sizes="192x192" href="./icon-192.png"/>
+  <link rel="manifest" href="./manifest.json"/>
+  <script>/* PWA: تسجيل service worker (شبكة-أولاً) — مطلوب لتثبيت التطبيق على أندرويد */
+  if('serviceWorker'in navigator){window.addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){});});}</script>
+
+
+  <!-- ═══════ Firebase SDK ═══════ -->
+  <script type="module">
+    import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+    import { getAuth, signInWithEmailAndPassword, signInAnonymously, signOut, onAuthStateChanged, browserLocalPersistence, setPersistence }
+      from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+    import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager,
+             doc, collection, getDoc, setDoc, updateDoc, deleteDoc,
+             onSnapshot, getDocs, limit, addDoc, query, where, orderBy, serverTimestamp, writeBatch }
+      from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+    const firebaseConfig = window.FIREBASE_CONFIG;   // ← يأتي من config.js (الملف الوحيد للتعديل)
+
+    const _app  = initializeApp(firebaseConfig);
+    const _auth = getAuth(_app);
+    // كاش محلّي دائم (IndexedDB) — يقلّل القراءات؛ مع fallback آمن
+    let _db;
+    try {
+      _db = initializeFirestore(_app, { localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() }), experimentalAutoDetectLongPolling: true });
+    } catch (e) {
+      _db = getFirestore(_app);
+    }
+    window._fb = {
+      auth: _auth, db: _db,
+      signIn:  (email, pass) => setPersistence(_auth, browserLocalPersistence).catch(function(){}).then(function(){ return signInWithEmailAndPassword(_auth, email, pass); }),
+      signInAnon: ()         => signInAnonymously(_auth),
+      signOut: ()            => signOut(_auth),
+      onAuth:  (cb)          => onAuthStateChanged(_auth, cb),
+      col:        (...p)     => collection(_db, ...p),
+      docRef:     (...p)     => doc(_db, ...p),
+      getDoc:     (...p)     => getDoc(doc(_db, ...p)),
+      setDoc:     (ref, d, opts) => opts ? setDoc(ref, d, opts) : setDoc(ref, d),
+      updateDoc:  (ref, d)   => updateDoc(ref, d),
+      deleteDoc:  (ref)      => deleteDoc(ref),
+      addDoc:     (ref, d)   => addDoc(ref, d),
+      onSnapshot, getDocs, limit, query, where, orderBy, serverTimestamp,
+      batch: () => writeBatch(_db),
+      uploadLogo: function(role, file) {
+        // الصورة الشخصية تُخزَّن كـ data URL مضغوط داخل Firestore (settings/<role>) —
+        // بلا Firebase Storage (يتطلّب خطة Blaze). نُصغّرها لـ 256px ونضغطها JPEG
+        // فيصبح الناتج ~20-40KB، أصغر بكثير من حدّ المستند (1MiB).
+        return new Promise(function(resolve, reject) {
+          var reader = new FileReader();
+          reader.onerror = function() { reject(new Error('read-failed')); };
+          reader.onload = function() {
+            var img = new Image();
+            img.onerror = function() { reject(new Error('decode-failed')); };
+            img.onload = function() {
+              var MAX = 256, w = img.width, h = img.height;
+              if (w > h && w > MAX) { h = Math.round(h * MAX / w); w = MAX; }
+              else if (h > MAX)     { w = Math.round(w * MAX / h); h = MAX; }
+              var canvas = document.createElement('canvas');
+              canvas.width = w; canvas.height = h;
+              var ctx = canvas.getContext('2d');
+              ctx.fillStyle = '#ffffff'; ctx.fillRect(0, 0, w, h); // خلفية بيضاء بدل الشفافية
+              ctx.drawImage(img, 0, 0, w, h);
+              resolve(canvas.toDataURL('image/jpeg', 0.85));
+            };
+            img.src = reader.result;
+          };
+          reader.readAsDataURL(file);
+        });
+      },
+    };
+    // الحفظ المحلّي هو الافتراضي أصلاً — نضبطه في الخلفية دون انتظار حتى لا يتعلّق الدخول أبداً
+    setPersistence(_auth, browserLocalPersistence).catch(function(){});
+    window._fbReady = true;
+    window.dispatchEvent(new Event('fbReady'));
+  </script>
+  <style>
+    .support-header{text-align:center;padding:16px 0 20px;}
+    @keyframes nawwa-spin{from{transform:rotate(0deg)}to{transform:rotate(360deg)}}
+    .support-logo{max-width:160px;max-height:56px;width:auto;height:auto;margin:0 auto 10px;display:block;object-fit:contain;animation:nawwa-spin 8s linear infinite;}
+    .support-name{font-size:1rem;font-weight:800;color:var(--text-primary);margin:0 0 3px;}
+    .support-sub{font-size:.78rem;color:var(--text-muted);margin:0;}
+    .support-cards{display:flex;flex-direction:column;gap:10px;}
+    .support-card{display:flex;align-items:center;gap:14px;padding:14px 16px;border-radius:14px;border:1.5px solid var(--border);background:var(--surface);text-decoration:none;transition:border-color .15s,transform .1s,box-shadow .15s;}
+    .support-card:hover{border-color:var(--primary);transform:translateY(-1px);box-shadow:0 4px 14px rgba(13,148,136,.12);}
+    .support-card:active{transform:scale(.99);}
+    .support-card-icon{width:42px;height:42px;border-radius:11px;display:flex;align-items:center;justify-content:center;font-size:1.2rem;flex-shrink:0;}
+    .sc-wa .support-card-icon{background:#dcfce7;color:#16a34a;}
+    .sc-tel .support-card-icon{background:#e0f2fe;color:#0284c7;}
+    .sc-web .support-card-icon{background:#ede9fe;color:#7c3aed;}
+    body.theme-dark .sc-wa .support-card-icon{background:rgba(22,163,74,.18);color:#4ade80;}
+    body.theme-dark .sc-tel .support-card-icon{background:rgba(2,132,199,.18);color:#38bdf8;}
+    body.theme-dark .sc-web .support-card-icon{background:rgba(124,58,237,.18);color:#a78bfa;}
+    .support-card-title{display:block;font-size:.88rem;font-weight:700;color:var(--text-primary);margin-bottom:2px;}
+    .support-card-sub{display:block;font-size:.76rem;color:var(--text-muted);direction:ltr;text-align:right;}
+    .support-card-arrow{color:var(--text-muted);font-size:.7rem;}
+    .support-copy{text-align:center;font-size:.72rem;color:var(--text-muted);margin-top:20px;}
+    .support-info-card{background:var(--bg);border:1.5px solid var(--border);border-radius:14px;padding:12px 16px;margin-bottom:18px;}
+    .support-info-row{display:flex;justify-content:space-between;align-items:center;padding:6px 0;}
+    .support-info-row+.support-info-row{border-top:1px solid var(--border);}
+    .support-info-label{font-size:.76rem;color:var(--text-muted);font-weight:500;}
+    .support-info-val{font-size:.78rem;font-weight:700;color:var(--text-primary);direction:ltr;}
+    .copy-btn{background:none;border:none;cursor:pointer;padding:4px 7px;border-radius:7px;color:var(--text-muted);font-size:.85rem;transition:color .15s,background .15s;line-height:1;flex-shrink:0;}
+    .copy-btn:hover{background:var(--border);color:var(--text-primary);}
+    .support-faq-section{margin-top:18px;}
+    .faq-section-title{font-size:.74rem;font-weight:800;color:var(--text-muted);letter-spacing:.4px;margin:0 0 8px;padding:0 2px;display:flex;align-items:center;gap:5px;}
+    .faq-item{border:1.5px solid var(--border);border-radius:12px;margin-bottom:7px;background:var(--surface);overflow:hidden;}
+    .faq-q{display:flex;justify-content:space-between;align-items:center;padding:11px 14px;cursor:pointer;font-size:.83rem;font-weight:600;color:var(--text-primary);user-select:none;gap:10px;}
+    .faq-q::after{content:'▾';font-size:.8rem;color:var(--text-muted);flex-shrink:0;transition:transform .2s;}
+    .faq-item.open .faq-q::after{transform:rotate(-180deg);}
+    .faq-a{max-height:0;overflow:hidden;transition:max-height .3s ease;}
+    .faq-item.open .faq-a{max-height:200px;}
+    .faq-a-inner{padding:0 14px 12px;font-size:.79rem;color:var(--text-muted);line-height:1.65;}
+    .sc-prv .support-card-icon{background:#fef3c7;color:#d97706;}
+    body.theme-dark .sc-prv .support-card-icon{background:rgba(217,119,6,.18);color:#fbbf24;}
+    .prm-card{width:100%;max-width:500px;margin:auto;background:var(--surface);border-radius:22px;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,.25);}
+    .prm-head{padding:18px 20px 16px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;}
+    .prm-title{margin:0;font-size:.95rem;font-weight:800;color:var(--text-primary);}
+    .prm-close{background:var(--bg);border:1.5px solid var(--border);border-radius:10px;width:34px;height:34px;cursor:pointer;font-size:1.1rem;color:var(--text-muted);display:flex;align-items:center;justify-content:center;transition:background .15s;flex-shrink:0;}
+    .prm-close:hover{background:var(--border);}
+    .prm-body{padding:16px 20px 20px;display:flex;flex-direction:column;gap:8px;}
+    .prm-copy{text-align:center;font-size:.7rem;color:var(--text-muted);padding:12px 20px 16px;border-top:1px solid var(--border);margin:0;}
+  </style>
+</head>
+
+<body>
+  <div id="loginOverlay" style="position:fixed;inset:0;z-index:9999;background:linear-gradient(145deg,#f0fdfa,#ccfbf1);display:none;align-items:center;justify-content:center;padding:20px;font-family:'Tajawal',sans-serif;">
+    <div style="background:white;border-radius:28px;box-shadow:0 24px 72px rgba(13,148,136,.18);padding:40px 32px 36px;width:100%;max-width:420px;animation:loginCardIn .5s cubic-bezier(.34,1.56,.64,1);">
+      <div style="text-align:center;margin-bottom:28px;">
+        <div style="display:inline-flex;width:90px;height:90px;border-radius:24px;background:linear-gradient(135deg,#0d9488,#14b8a6);margin-bottom:16px;overflow:hidden;"><img src="./icon-192.png" style="width:90px;height:90px;object-fit:cover;" onerror="this.style.display='none'"/></div>
+        <div style="font-size:1.7rem;font-weight:800;color:#0d9488;">DocBook</div>
+        <div style="font-size:.85rem;font-weight:600;color:#5f9ea0;margin-top:4px;">لوحة الممرضة</div>
+      </div>
+      <div id="loginForm">
+        <div style="margin-bottom:16px;"><label style="display:block;font-size:.82rem;font-weight:700;color:#134e4a;margin-bottom:7px;">البريد الإلكتروني</label><input id="loginUser" type="email" placeholder="example@gmail.com" dir="ltr" style="width:100%;padding:13px 16px;border:2px solid #b2f5ea;border-radius:14px;font-size:.9rem;outline:none;box-sizing:border-box;font-family:inherit;background:#f0fdfa;" onfocus="this.style.borderColor='#0d9488'" onblur="this.style.borderColor='#b2f5ea'"/></div>
+        <div style="margin-bottom:10px;"><label style="display:block;font-size:.82rem;font-weight:700;color:#134e4a;margin-bottom:7px;">كلمة المرور</label><div style="display:flex;align-items:center;gap:8px;"><input id="loginPassword" type="password" placeholder="••••••••" dir="ltr" style="flex:1;padding:13px 16px;border:2px solid #b2f5ea;border-radius:14px;font-size:.9rem;outline:none;box-sizing:border-box;font-family:inherit;background:#f0fdfa;" onfocus="this.style.borderColor='#0d9488'" onblur="this.style.borderColor='#b2f5ea'"/><button type="button" onclick="var i=document.getElementById('loginPassword');i.type=i.type==='password'?'text':'password';this.querySelector('svg').style.opacity=i.type==='text'?'1':'0.45';" style="flex-shrink:0;width:40px;height:40px;border-radius:12px;border:2px solid #b2f5ea;background:#f0fdfa;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:border-color .15s;" onmouseover="this.style.borderColor='#0d9488'" onmouseout="this.style.borderColor='#b2f5ea'"><svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;transition:opacity .15s;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg></button></div></div>
+        <div id="loginError" style="display:none;background:#fee2e2;border-radius:10px;padding:10px;font-size:.8rem;color:#dc2626;margin-bottom:12px;text-align:center;"></div>
+        <button onclick="doLocalLogin()" id="loginBtn" style="width:100%;padding:14px;background:linear-gradient(135deg,#0d9488,#14b8a6);color:white;border:none;border-radius:14px;font-family:inherit;font-size:.95rem;font-weight:800;cursor:pointer;">تسجيل الدخول</button>
+      </div>
+      <div id="loginVerifying" style="display:none;text-align:center;padding:18px 0;">
+        <div class="login-spinner"></div>
+        <div style="font-size:.95rem;font-weight:800;color:#0d9488;margin-top:18px;">جارٍ التحقق من البيانات...</div>
+        <div style="font-size:.78rem;font-weight:600;color:#5f9ea0;margin-top:6px;">يرجى الانتظار قليلاً</div>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- ========== HEADER ========== -->
+  <header class="mobile-topbar">
+    <div class="mtb-brand" id="headerLogo" onclick="goToToday()">
+      <div class="mtb-avatar" id="headerLogoContainer">
+        <i class="fas fa-user-nurse" id="headerLogoIcon"></i>
+        <img id="headerLogoImg" class="hidden" src="" alt="شعار">
+      </div>
+      <div style="min-width:0;display:flex;flex-direction:column;">
+        <span class="mtb-name" id="dashboardTitle">لوحة الممرضة</span>
+        <span class="mtb-date" id="nurseHeaderDate">اليوم، التاريخ</span>
+      </div>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;">
+      <button class="mtb-btn" id="headerSearchBtn" onclick="toggleHeaderSearch()" title="بحث عن مريض">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+      </button>
+      <button class="mtb-btn" onclick="openSettingsModal()" title="الإعدادات">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- شريط بحث المريض (موبايل) — يفتح من زر البحث بالهيدر -->
+  <div id="headerSearchBar" class="hidden">
+    <div class="search-wrapper" style="margin-bottom:0;">
+      <i class="fas fa-search search-icon"></i>
+      <input type="text" id="headerPatientSearch" class="search-input" placeholder="ابحث عن مريض بالاسم أو الهاتف..." oninput="renderHeaderPatientSearch()">
+      <button onclick="toggleHeaderSearch()" title="إغلاق" style="position:absolute; left:8px; top:50%; transform:translateY(-50%); background:none; border:none; color:var(--text-muted); cursor:pointer; font-size:1rem;"><i class="fas fa-times"></i></button>
+    </div>
+    <div id="headerSearchResults" style="display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height:55vh; overflow-y:auto;"></div>
+  </div>
+
+  <!-- ========== APP BODY ========== -->
+  <div class="app-body">
+
+    <!-- ====== FULL-HEIGHT COLLAPSIBLE RAIL ====== -->
+    <nav class="rail" id="mainRail" role="navigation" aria-label="التنقل الرئيسي">
+
+      <!-- صورة الممرضة + الاسم (تظهر عند الفتح) -->
+      <div class="rail-profile">
+        <div class="rail-avatar" id="sidebarNurseAvatar"><i class="fas fa-user-nurse"></i></div>
+        <div class="rail-profile-info">
+          <div class="rail-profile-name" id="sidebarNurseName">لوحة الممرضة</div>
+          <div class="rail-profile-date" id="sidebarNurseDate">اليوم، التاريخ</div>
+        </div>
+      </div>
+
+      <!-- زر الطي / الفتح (سهم) -->
+      <button class="rail-toggle" onclick="toggleRail()" data-tip="طي / فتح" aria-label="طي / فتح القائمة">
+        <div class="rail-toggle-icon">
+          <svg id="railArrowIcon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .3s cubic-bezier(.4,0,.2,1);">
+            <polyline points="15 18 9 12 15 6"/>
+          </svg>
+        </div>
+      </button>
+
+      <!-- عناصر التنقل -->
+      <div class="rail-nav">
+        <!-- المواعيد -->
+        <button class="rail-nav-btn sidebar-item active" id="sidebarAppointments" onclick="toggleApptSubNav()" data-tip="المواعيد" aria-label="المواعيد">
+          <span class="rail-badge" id="apptNavDot" style="display:none;"></span>
+          <div class="rail-nav-icon"><i class="fas fa-calendar-check"></i></div>
+          <div class="rail-nav-label">
+            <span class="rail-nav-label-main" data-i18n="nav_appointments">المواعيد</span>
+            <span class="rail-nav-label-sub">الطلبات والمؤكدة</span>
+          </div>
+        </button>
+        <!-- المرضى -->
+        <button class="rail-nav-btn sidebar-item" id="sidebarPatients" data-tip="دفتر المرضى" aria-label="دفتر المرضى">
+          <div class="rail-nav-icon"><i class="fas fa-address-book"></i></div>
+          <div class="rail-nav-label">
+            <span class="rail-nav-label-main" data-i18n="nav_patients">دفتر المرضى</span>
+            <span class="rail-nav-label-sub">سجل المرضى</span>
+          </div>
+        </button>
+        <!-- الروزنامة -->
+        <button class="rail-nav-btn sidebar-item" id="sidebarCalendar" data-tip="الروزنامة" aria-label="الروزنامة">
+          <div class="rail-nav-icon"><i class="fas fa-calendar-alt"></i></div>
+          <div class="rail-nav-label">
+            <span class="rail-nav-label-main" data-i18n="nav_calendar">الروزنامة</span>
+            <span class="rail-nav-label-sub">التقويم اليومي</span>
+          </div>
+        </button>
+        <div class="rail-divider"></div>
+        <!-- الإعدادات -->
+        <button class="rail-nav-btn sidebar-item" id="sidebarSettingsBtn" onclick="openSettingsModal()" data-tip="الإعدادات" aria-label="الإعدادات">
+          <div class="rail-nav-icon"><i class="fas fa-cog"></i></div>
+          <div class="rail-nav-label">
+            <span class="rail-nav-label-main" data-i18n="settings">الإعدادات</span>
+            <span class="rail-nav-label-sub">ضبط التطبيق</span>
+          </div>
+        </button>
+      </div>
+
+      <!-- أسفل: DocBook -->
+      <div class="rail-bottom">
+        <div class="rail-bottom-icon">
+          <img src="./logo.png" style="width:42px;height:42px;object-fit:contain;filter:brightness(0) invert(1);" alt="DocBook" onerror="this.style.display='none'">
+        </div>
+        <div class="rail-bottom-text">
+          <span class="rail-bottom-text-name">DocBook</span>
+          <span class="rail-bottom-text-sub">Smart Clinic Management</span>
+        </div>
+      </div>
+
+    </nav>
+
+    <!-- Hidden div for JS compatibility -->
+    <div id="sidebarApptSub" style="display:none;">
+      <button id="subPending"></button><button id="subAccepted"></button>
+      <span id="subBadgePending" style="display:none;">0</span><span id="subBadgeAccepted" style="display:none;">0</span>
+    </div>
+
+    <!-- Content -->
+    <div class="content-area">
+
+      <!-- Toast -->
+      <div id="toast" class="toast hidden">
+        <div id="toastContent"></div>
+      </div>
+
+      <!-- Loader -->
+      <div id="loader" class="hidden">
+        <div class="glass-card p-5 flex items-center gap-3 justify-center">
+          <i class="fas fa-circle-notch fa-spin" style="color:var(--primary); font-size:1.2rem;"></i>
+          <span style="font-weight:700; color:var(--primary);">جاري جلب البيانات...</span>
+        </div>
+      </div>
+
+      <!-- ========== APPOINTMENTS SECTION ========== -->
+      <section id="appointmentsSection" class="hidden">
+
+        <!-- Tab bar -->
+        <div style="display:flex; justify-content:center; margin-bottom:14px;">
+        <div style="background:var(--surface); border:1.5px solid var(--border); border-radius:50px; padding:5px; display:flex; gap:5px; box-shadow:var(--shadow-sm); width:100%; max-width:420px;">
+          <button id="apptTabBtnPending" onclick="selectApptSub('pending')"
+            style="flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:9px 14px; border-radius:50px; border:none; cursor:pointer; font-family:inherit; font-weight:700; font-size:.82rem; transition:all .22s; background:transparent; color:var(--text-muted);">
+            <!-- Bell / new request icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
+              <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
+              <line x1="12" y1="2" x2="12" y2="3"/>
+            </svg>
+            طلبات جديدة
+            <span id="apptBadgePending" style="min-width:20px;height:20px;padding:0 5px;border-radius:50px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;background:var(--border);color:var(--text-muted);transition:all .22s;">0</span>
+          </button>
+          <button id="apptTabBtnAccepted" onclick="selectApptSub('accepted')"
+            style="flex:1; display:flex; align-items:center; justify-content:center; gap:7px; padding:9px 14px; border-radius:50px; border:none; cursor:pointer; font-family:inherit; font-weight:700; font-size:.82rem; transition:all .22s; background:var(--primary); color:white; box-shadow:0 2px 12px rgba(13,148,136,.3);">
+            <!-- Calendar check icon -->
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;">
+              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"/>
+              <line x1="16" y1="2" x2="16" y2="6"/>
+              <line x1="8" y1="2" x2="8" y2="6"/>
+              <line x1="3" y1="10" x2="21" y2="10"/>
+              <polyline points="9 16 11 18 15 14"/>
+            </svg>
+            مواعيد مؤكدة
+            <span id="apptBadgeAccepted" style="min-width:20px;height:20px;padding:0 5px;border-radius:50px;display:inline-flex;align-items:center;justify-content:center;font-size:.72rem;font-weight:800;background:rgba(255,255,255,.25);color:white;transition:all .22s;">0</span>
+          </button>
+        </div>
+        </div><!-- end tab-bar centering wrapper -->
+
+        <!-- Dual view -->
+        <div id="appointmentsDualView">
+
+          <!-- Pending Column -->
+          <div class="glass-card">
+            <div id="pendingCardsContainer"></div>
+          </div>
+
+          <!-- Accepted Column -->
+          <div class="glass-card">
+            <div class="search-wrapper" style="margin-bottom:14px;">
+              <i class="fas fa-search search-icon"></i>
+              <input type="text" id="searchInput" class="search-input" placeholder="ابحث بالاسم - رقم الهاتف - التاريخ">
+            </div>
+            <div id="acceptedCardsContainer"></div>
+          </div>
+
+        </div>
+
+        <!-- Hidden legacy containers kept for JS compatibility -->
+        <div id="appointmentsContentContainer" style="display:none;">
+          <div id="appointmentsGridContainer">
+            <div id="searchContainer"><input type="text" id="searchInputLegacy"></div>
+            <div id="appointmentsCardsDesktop"></div>
+          </div>
+          <div id="manualFormContainer"></div>
+        </div>
+        <!-- Hidden tab elements for JS compatibility -->
+        <div style="display:none;">
+          <div id="appointmentsPendingTab"></div>
+          <div id="appointmentsAcceptedTab"></div>
+        </div>
+
+      </section>
+
+      <!-- ========== PATIENTS SECTION ========== -->
+      <section id="patientBookSection" class="hidden">
+        <div class="glass-card">
+          <div class="card-header">
+            <div class="card-title-row">
+              <div class="card-icon"><i class="fas fa-address-book"></i></div>
+              <div>
+                <div class="card-title">دفتر المرضى</div>
+                <div class="card-subtitle">سجل المرضى والزيارات</div>
+              </div>
+            </div>
+            <span class="card-badge"><i class="fas fa-users" style="margin-left:5px;"></i><span id="totalPatientsCount">0</span></span>
+          </div>
+
+          <div style="display:flex; gap:12px; margin-bottom:16px;">
+            <button id="addNewPatientBtn" class="btn-primary" style="font-size:.85rem; padding:9px 16px;">
+              <i class="fas fa-user-plus"></i> مريض جديد
+            </button>
+            <div class="search-wrapper" style="flex:1; margin-bottom:0;">
+              <i class="fas fa-search search-icon"></i>
+              <input type="text" id="patientBookSearch" class="search-input" placeholder="ابحث باسم المريض أو رقم الهاتف...">
+            </div>
+          </div>
+
+          <div class="patients-list" id="patientsGrid"></div>
+        </div>
+      </section>
+
+      <!-- ========== CALENDAR SECTION ========== -->
+      <section id="calendarSection" class="hidden">
+        <!-- Schedule styles -->
+
+        <!-- Breadcrumb -->
+        <div style="display:flex;align-items:center;justify-content:flex-start;gap:8px;padding:2px 0 14px 0;font-size:.85rem;">
+          <span style="font-weight:800;color:var(--primary);" data-i18n="appointments">المواعيد</span>
+          <i class="fas fa-chevron-left" style="font-size:.58rem;color:var(--text-muted);opacity:.55;"></i>
+          <span style="color:var(--text-muted);font-weight:600;" data-i18n="today">اليوم</span>
+          <span id="calGreeting" style="display:none;"></span>
+          <span id="calDateLabel" style="display:none;"></span>
+        </div>
+
+        <div class="cal-row" style="display:flex; flex-wrap:wrap; gap:16px; align-items:flex-start;">
+
+            <!-- ===== SIDEBAR (يظهر يميناً في RTL) ===== -->
+            <aside style="width:100%; max-width:300px; flex-shrink:0; display:flex; flex-direction:column; gap:14px;">
+
+            <!-- Calendar -->
+            <div class="compact-calendar-container" id="calendarWidget" style="flex-shrink:0; width:100%; align-self:start;">
+              <div class="compact-calendar-header">
+                <button id="prevMonthBtn" class="compact-nav-btn"><i class="fas fa-chevron-right"></i></button>
+                <div style="text-align:center;">
+                  <h3 id="currentMonth" style="font-weight:700; font-size:.95rem;">-</h3>
+                  <div class="density-legend">
+                    <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#2563eb;"></div><span>خفيف</span></div>
+                    <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:var(--amber);"></div><span>متوسط</span></div>
+                    <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:var(--red);"></div><span>مزدحم</span></div>
+                  </div>
+                </div>
+                <button id="nextMonthBtn" class="compact-nav-btn"><i class="fas fa-chevron-left"></i></button>
+              </div>
+              <div class="compact-calendar-grid" style="margin-bottom:8px;">
+                <div class="compact-calendar-day-name">Su</div>
+                <div class="compact-calendar-day-name">Mo</div>
+                <div class="compact-calendar-day-name">Tu</div>
+                <div class="compact-calendar-day-name">We</div>
+                <div class="compact-calendar-day-name">Th</div>
+                <div class="compact-calendar-day-name">Fr</div>
+                <div class="compact-calendar-day-name">Sa</div>
+              </div>
+              <div id="calendarGrid" class="compact-calendar-grid"></div>
+            </div>
+
+            <!-- ===== مواعيد اليوم (عرض الموبايل) ===== -->
+            <div id="mobileAgendaWrap" class="mobile-only glass-card" style="padding:14px 16px;">
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:12px;">
+                <p id="mobileAgendaTitle" style="font-weight:800; font-size:.88rem; color:var(--text);">مواعيد اليوم</p>
+                <span id="mobileDayLock" onclick="schedToggleDay(selectedDayStr||todayStr)" style="font-size:.72rem; font-weight:800; cursor:pointer; padding:4px 11px; border-radius:20px;"></span>
+              </div>
+              <div id="mobileDayAgenda" style="display:flex; flex-direction:column; gap:14px;"></div>
+            </div>
+
+            <!-- بطاقات ملخّص اليوم (موبايل) — بين المواعيد والدليل -->
+            <div id="mobileStatsWrap" class="mobile-only">
+              <div class="msum total"><div class="msum-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#0d9488" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="3"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><polyline points="9 16 11 18 15 14"/></svg></div><div><div class="msum-n" id="msTotal">0</div><div class="msum-l">مواعيد اليوم</div></div></div>
+              <div class="msum rem"><div class="msum-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg></div><div><div class="msum-n" id="msRem">0</div><div class="msum-l">المتبقية</div></div></div>
+              <div class="msum vis"><div class="msum-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><polyline points="16 11 18 13 22 9"/></svg></div><div><div class="msum-n" id="msVis">0</div><div class="msum-l">زاروا اليوم</div></div></div>
+              <div class="msum abs"><div class="msum-ic"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="17" y1="8" x2="22" y2="13"/><line x1="22" y1="8" x2="17" y2="13"/></svg></div><div><div class="msum-n" id="msAbs">0</div><div class="msum-l">لم يحضروا</div></div></div>
+            </div>
+
+            <!-- Patient search (تُخفى على الهاتف؛ البحث في الهيدر) -->
+            <div class="glass-card phone-hidden" style="padding:14px 16px;">
+              <p style="font-weight:800; font-size:.85rem; color:var(--text); margin-bottom:8px;" data-i18n="patient_search">البحث عن مريض في دفتر المرضى</p>
+              <div class="search-wrapper" style="margin-bottom:0;">
+                <i class="fas fa-search search-icon"></i>
+                <input type="text" id="calPatientSearch" class="search-input" placeholder="اختر مريض..." data-i18n-ph="choose_patient_ph" oninput="renderCalPatientSearch()">
+              </div>
+              <div id="calPatientSearchResults" style="display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height:220px; overflow-y:auto;"></div>
+            </div>
+
+            <!-- Legend (يظهر على كل الأجهزة) -->
+            <div class="glass-card" style="padding:14px 16px;">
+              <p style="font-weight:800; font-size:.82rem; color:var(--text); margin-bottom:10px;" data-i18n="legend">الدليل:</p>
+              <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px 14px;">
+                <div class="cal-legend-row"><span data-i18n="visit_new">زيارة جديدة</span><span class="cal-legend-dot" style="background:#7c3aed;"></span></div>
+                <div class="cal-legend-row"><span data-i18n="visit_review">مراجعة</span><span class="cal-legend-dot" style="background:#f59e0b;"></span></div>
+                <div class="cal-legend-row"><span data-i18n="visit_tests">تحاليل</span><span class="cal-legend-dot" style="background:#2563eb;"></span></div>
+                <div class="cal-legend-row"><span data-i18n="no_show">لم يحضر</span><span class="cal-legend-dot" style="background:#ef4444;"></span></div>
+                <div class="cal-legend-row"><span data-i18n="visited">تمت الزيارة</span><span class="cal-legend-dot" style="background:#16a34a;"></span></div>
+              </div>
+            </div>
+
+            </aside><!-- /sidebar -->
+
+            <!-- ===== MAIN: Schedule hourly grid (لابتوب/تابلت) ===== -->
+            <div class="glass-card desktop-only" style="flex:1; min-width:300px; padding:0; overflow:hidden; align-self:stretch;">
+              <!-- Toolbar -->
+              <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; padding:12px 14px; border-bottom:1.5px solid var(--border); flex-wrap:wrap;">
+                <!-- يمين: اليوم/الأسبوع -->
+                <div class="sched-toggle">
+                  <button id="schedDayBtn" onclick="setScheduleView('day')" data-i18n="day">يوم</button>
+                  <button id="schedWeekBtn" class="active" onclick="setScheduleView('week')" data-i18n="week">أسبوع</button>
+                </div>
+                <!-- وسط: التنقّل بين التواريخ -->
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <button class="compact-nav-btn" onclick="schedNav(-1)" title="السابق"><i class="fas fa-chevron-right"></i></button>
+                  <span id="schedRangeLabel" style="font-weight:800; font-size:.9rem; color:var(--text); min-width:150px; text-align:center;">-</span>
+                  <button class="compact-nav-btn" onclick="schedNav(1)" title="التالي"><i class="fas fa-chevron-left"></i></button>
+                </div>
+                <!-- يسار: أزرار التحكّم -->
+                <div style="display:flex; align-items:center; gap:6px;">
+                  <button onclick="schedZoom(-1)" class="compact-nav-btn" title="تصغير"><i class="fas fa-magnifying-glass-minus"></i></button>
+                  <button onclick="schedZoom(1)" class="compact-nav-btn" title="تكبير"><i class="fas fa-magnifying-glass-plus"></i></button>
+                  <button onclick="toggleMiniCalendar()" id="miniCalToggleBtn" class="compact-nav-btn" title="إظهار/إخفاء الروزنامة"><i class="far fa-calendar-days"></i></button>
+                  <button onclick="toggleSchedSearch()" id="schedSearchBtn" class="compact-nav-btn" title="بحث في المواعيد المؤكدة المستقبلية"><i class="fas fa-magnifying-glass"></i></button>
+                  <button onclick="toggleSchedFullscreen()" id="schedFullBtn" class="compact-nav-btn" title="ملء الشاشة"><i class="fas fa-expand"></i></button>
+                  <button onclick="schedToday()" style="display:inline-flex; align-items:center; gap:7px; font-size:.8rem; font-weight:800; color:var(--primary); background:var(--primary-light); border:1.5px solid var(--border-strong); border-radius:8px; padding:7px 14px; cursor:pointer; font-family:inherit;">
+                    <i class="far fa-calendar"></i> <span data-i18n="today">اليوم</span>
+                  </button>
+                </div>
+              </div>
+              <!-- شريط البحث في المواعيد المؤكدة المستقبلية -->
+              <div id="schedSearchBar" style="display:none; padding:12px 14px; border-bottom:1.5px solid var(--border); background:var(--bg);">
+                <div class="search-wrapper" style="margin-bottom:0;">
+                  <i class="fas fa-search search-icon"></i>
+                  <input type="text" id="schedSearchInput" class="search-input" placeholder="ابحث في المواعيد المؤكدة القادمة (اسم / هاتف / تاريخ)..." oninput="renderSchedSearch()">
+                </div>
+                <div id="schedSearchResults" style="display:flex; flex-direction:column; gap:6px; margin-top:10px; max-height:42vh; overflow-y:auto;"></div>
+              </div>
+              <!-- Grid -->
+              <div id="scheduleGrid" style="overflow:auto; max-height:72vh;"></div>
+            </div>
+
+        </div>
+
+        <!-- ===== تذكير مواعيد اليوم (يظهر على الجوال والكمبيوتر) ===== -->
+        <div class="glass-card" id="todayRemindersPanel" style="margin-top:16px; padding:16px 18px;">
+          <p style="font-weight:800; font-size:.9rem; color:var(--text); margin-bottom:12px; display:flex; align-items:center; gap:7px;">
+            <i class="fas fa-bell" style="color:var(--primary);"></i> تذكير مواعيد اليوم
+          </p>
+          <div id="todayRemindersList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+        <!-- Hidden agenda (kept for internal logic & day open/close) -->
+        <div id="dayAgenda" class="hidden" style="display:none;">
+          <h3 id="agendaTitle"></h3>
+          <p id="agendaCount"></p>
+          <span id="dayStatusBadge" class="day-status-badge open">مفتوح</span>
+          <span id="closeDayIcon" class="close-day-icon"><i class="fas fa-times-circle"></i></span>
+          <span id="openDayIcon" class="open-day-icon hidden"><i class="fas fa-check-circle"></i></span>
+          <button id="showDayDetailsBtn" class="btn-show-details"><i class="fas fa-eye"></i></button>
+          <span id="agendaMorningCount"></span><div id="agendaMorning"></div>
+          <span id="agendaEveningCount"></span><div id="agendaEvening"></div>
+        </div>
+      </section>
+
+
+    </div>
+  </div>
+
+  <!-- ========== SMS FALLBACK MODAL ========== -->
+  <div id="smsFallbackModal" class="hidden fixed inset-0 z-[350] flex items-end justify-center p-4" style="pointer-events:none;">
+    <div id="smsFallbackCard" style="
+      pointer-events:all;
+      background:var(--surface);
+      border:1.5px solid var(--border);
+      border-radius:var(--radius-lg);
+      box-shadow:var(--shadow-lg);
+      padding:18px 20px;
+      width:100%;
+      max-width:420px;
+      transform:translateY(20px);
+      opacity:0;
+      transition:transform .3s cubic-bezier(.34,1.56,.64,1), opacity .25s;
+    ">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div style="width:40px;height:40px;border-radius:11px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fab fa-whatsapp" style="color:#16a34a;font-size:1.2rem;"></i>
+        </div>
+        <div>
+          <p style="font-weight:800;font-size:.92rem;color:var(--text);line-height:1.2;">هل وصلت رسالة الواتساب؟</p>
+          <p style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">إذا لم يكن المريض يمتلك واتساب، أرسل SMS</p>
+        </div>
+        <button onclick="closeSmsModal()" style="margin-right:auto;background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:4px;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="closeSmsModal()" style="
+          flex:1;background:var(--green-light);color:var(--green);border:1.5px solid #86efac;
+          border-radius:var(--radius-sm);padding:10px;font-weight:800;font-size:.88rem;
+          font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <i class="fas fa-check"></i> نعم، وصلت
+        </button>
+        <button id="smsFallbackBtn" onclick="sendSMSFallback()" style="
+          flex:1;background:var(--blue);color:white;border:none;
+          border-radius:var(--radius-sm);padding:10px;font-weight:800;font-size:.88rem;
+          font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <i class="fas fa-sms"></i> لا، أرسل SMS
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== REMINDER CONFIRM MODAL ========== -->
+  <div id="reminderConfirmModal" class="hidden">
+    <div class="reminder-modal-box">
+      <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;">
+        <div style="width:40px;height:40px;border-radius:11px;background:#dcfce7;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+          <i class="fab fa-whatsapp" style="color:#16a34a;font-size:1.2rem;"></i>
+        </div>
+        <div style="flex:1;min-width:0;">
+          <p style="font-weight:800;font-size:.92rem;color:var(--text);line-height:1.2;">هل تمت الرسالة؟</p>
+          <p style="font-size:.72rem;color:var(--text-muted);margin-top:2px;">
+            هل أرسلتِ تذكير الموعد عبر واتساب لـ
+            <strong id="rcmPatientName" style="color:var(--primary);"></strong>
+          </p>
+        </div>
+        <button onclick="closeReminderConfirmModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1rem;padding:4px;flex-shrink:0;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button onclick="confirmReminderSent()" style="
+          flex:1;background:var(--green-light);color:var(--green);border:1.5px solid #86efac;
+          border-radius:var(--radius-sm);padding:10px;font-weight:800;font-size:.88rem;
+          font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;">
+          <i class="fas fa-check"></i> نعم، تمت الرسالة
+        </button>
+        <a id="rcmSmsBtn" href="#" onclick="closeReminderConfirmModal()" style="
+          flex:1;background:var(--blue);color:white;border:none;
+          border-radius:var(--radius-sm);padding:10px;font-weight:800;font-size:.88rem;
+          font-family:inherit;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;text-decoration:none;">
+          <i class="fas fa-sms"></i> لا SMS
+        </a>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========== REJECT MODAL (fullscreen desktop / bottom-sheet mobile) ========== -->
+  <div id="rejectModal" class="hidden">
+    <div id="rejectModalPanel">
+
+      <!-- Header -->
+      <div class="rmodal-header">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:38px;height:38px;border-radius:50%;background:var(--red-light);border:1.5px solid #fca5a5;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+            <i class="fas fa-calendar-times" style="color:var(--red);font-size:.9rem;"></i>
+          </div>
+          <div>
+            <h3 style="font-weight:800; font-size:1rem; color:var(--text); line-height:1.2;">رفض طلب الزيارة</h3>
+            <p style="font-size:.72rem; color:var(--text-muted); margin-top:2px;">اختاري مواعيد بديلة لإرسالها للمريض (اختياري)</p>
+          </div>
+        </div>
+        <button class="rmodal-close-btn" onclick="closeRejectModal()" title="إغلاق">
+          <i class="fas fa-times"></i>
+        </button>
+      </div>
+
+      <!-- Body (single col mobile / two cols desktop) -->
+      <div class="rmodal-body">
+
+        <!-- COL LEFT: patient info + calendar -->
+        <div class="rmodal-col-left">
+
+          <!-- Patient Info Banner -->
+          <div style="background:var(--red-light); border:1.5px solid #fca5a5; border-radius:var(--radius); padding:10px 12px; margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:8px; margin-bottom:8px;">
+              <div style="width:30px;height:30px;border-radius:50%;background:var(--red);display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <i class="fas fa-user-times" style="color:white;font-size:.75rem;"></i>
+              </div>
+              <div>
+                <p id="rejectPatientName" style="font-weight:700; font-size:.9rem; color:var(--text);"></p>
+                <p id="rejectPatientDate" style="font-size:.72rem; color:var(--red); margin-top:1px; font-weight:600;"></p>
+              </div>
+            </div>
+            <div style="background:white; border-radius:var(--radius-sm); padding:8px 10px; border:1px solid #fca5a5;">
+              <p style="font-size:.76rem; color:#7f1d1d; line-height:1.55;">
+                <i class="fas fa-info-circle" style="margin-left:5px; color:var(--red);"></i>
+                سيتم إرسال رسالة للمريض برفض موعده. يمكنك اختيار مواعيد بديلة من الروزنامة.
+              </p>
+            </div>
+          </div>
+
+          <!-- Calendar Title -->
+          <p style="font-weight:700; font-size:.84rem; color:var(--text); margin-bottom:8px;">
+            <i class="fas fa-calendar-alt" style="color:var(--primary); margin-left:6px;"></i>
+            اختاري مواعيد التعويض
+          </p>
+
+          <!-- Calendar Wrapper -->
+          <div class="compact-calendar-container" style="padding:12px !important;">
+
+          <!-- Calendar Nav -->
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:8px;">
+            <button onclick="prevRejectMonth()" class="compact-nav-btn" type="button"><i class="fas fa-chevron-right"></i></button>
+            <span id="rejectCalMonth" style="font-weight:700; font-size:.88rem; color:var(--text);"></span>
+            <button onclick="nextRejectMonth()" class="compact-nav-btn" type="button"><i class="fas fa-chevron-left"></i></button>
+          </div>
+
+          <!-- Day Names -->
+          <div class="rcal-grid" style="margin-bottom:3px;">
+            <div class="rcal-day-name">الجمعة</div>
+            <div class="rcal-day-name">السبت</div>
+            <div class="rcal-day-name">الأحد</div>
+            <div class="rcal-day-name">الإثنين</div>
+            <div class="rcal-day-name">الثلاثاء</div>
+            <div class="rcal-day-name">الأربعاء</div>
+            <div class="rcal-day-name">الخميس</div>
+          </div>
+
+          <!-- Calendar Grid -->
+          <div id="rejectCalGrid" class="rcal-grid"></div>
+
+          <!-- Legend -->
+          <div style="display:flex; align-items:center; gap:14px; margin-top:10px; font-size:.7rem; color:var(--text-muted); flex-wrap:wrap;">
+            <div style="display:flex;align-items:center;gap:5px;"><span style="width:11px;height:11px;border-radius:3px;background:var(--primary);display:inline-block;"></span> فيها مواعيد بديلة</div>
+            <div style="display:flex;align-items:center;gap:5px;"><span style="width:11px;height:11px;border-radius:3px;background:var(--red-light);border:1px solid #fca5a5;display:inline-block;"></span> مغلق</div>
+          </div>
+          </div><!-- /calendar wrapper -->
+
+          <!-- لوحة اختيار أوقات اليوم المحدد (نظام الساعات) -->
+          <div id="rejectTimePanel" style="margin-top:12px;"></div>
+        </div>
+
+        <!-- COL RIGHT: selected slots -->
+        <div class="rmodal-col-right">
+          <p style="font-weight:700; font-size:.84rem; color:var(--text); margin-bottom:8px;">
+            <i class="fas fa-check-double" style="color:var(--primary); margin-left:6px;"></i>
+            المواعيد المختارة للتعويض
+          </p>
+          <div id="rejectSelectedList" style="display:flex; flex-direction:column; gap:8px;"></div>
+        </div>
+
+      </div><!-- /rmodal-body -->
+
+      <!-- Footer -->
+      <div class="rmodal-footer">
+        <button id="rejectSendBtn" onclick="confirmReject()"
+          style="flex:1; border:none; border-radius:var(--radius-sm); padding:10px 14px; font-weight:700; font-size:.84rem; font-family:inherit; cursor:pointer; color:white; background:var(--red); transition:background .15s; display:flex; align-items:center; justify-content:center; gap:6px;">
+          <i class="fab fa-whatsapp"></i>
+          رفض بدون مواعيد بديلة
+        </button>
+        <button onclick="closeRejectModal()"
+          style="background:#e2e8f0; color:#475569; border:none; border-radius:var(--radius-sm); padding:10px 14px; font-weight:700; font-size:.84rem; font-family:inherit; cursor:pointer; display:flex; align-items:center; gap:5px; transition:background .15s; white-space:nowrap;"
+          onmouseover="this.style.background='#cbd5e1'" onmouseout="this.style.background='#e2e8f0'">
+          <i class="fas fa-arrow-right"></i> عودة
+        </button>
+      </div>
+
+    </div><!-- /rejectModalPanel -->
+  </div><!-- /rejectModal -->
+
+  <!-- BOTTOM NAV -->
+  <nav class="bottom-nav">
+    <!-- Hidden spans for JS count compatibility -->
+    <span id="pendingTabCount" style="display:none;">0</span>
+    <span id="acceptedTabCount" style="display:none;">0</span>
+    <span id="mobSubBadgePending" style="display:none;">0</span>
+    <span id="mobSubBadgeAccepted" style="display:none;">0</span>
+    <div class="bottom-nav-item" id="mobileCalendar">
+      <i class="fas fa-calendar-alt"></i><span>الروزنامة</span>
+    </div>
+    <div class="bottom-nav-item" id="mobilePatients">
+      <i class="fas fa-address-book"></i><span>المرضى</span>
+    </div>
+    <div class="bottom-nav-item" id="mobileAppointments" onclick="toggleApptSubNav()" style="position:relative;">
+      <span class="nav-dot" id="apptNavDotMobile" style="display:none; top:4px; left:auto; right:calc(50% - 22px);"></span>
+      <i class="fas fa-calendar-check"></i><span>المواعيد</span>
+    </div>
+    <div class="mob-fab-container">
+      <!-- Pills تظهر فوق الزر -->
+      <div id="mobPills">
+        <button class="fab-pill" onclick="closeMobFab();goToManualForm()">
+          <span class="fab-pill-icon appt">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18"/><path d="M8 2v3M16 2v3"/><path d="M9 14.5l1.5 1.5 3-3"/></svg>
+          </span>
+          <span class="fab-pill-label">موعد يدوي</span>
+        </button>
+        <button class="fab-pill" onclick="closeMobFab();openMsgCustomizer()">
+          <span class="fab-pill-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          </span>
+          <span class="fab-pill-label">تخصيص الرسائل</span>
+        </button>
+        <button class="fab-pill" onclick="closeMobFab();openNotesOverlay()">
+          <span class="fab-pill-icon notes">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+          </span>
+          <span class="fab-pill-label">ملاحظات</span>
+        </button>
+      </div>
+      <!-- الزر الرئيسي -->
+      <button class="fab-trigger" id="mobFabTrigger" onclick="toggleMobFab()" aria-label="قائمة سريعة">
+        <div class="fab-plus-icon"></div>
+      </button>
+    </div>
+
+  </nav>
+
+  <!-- ========== DESKTOP SPEED DIAL ========== -->
+  <!-- Pills منفصلة بـ fixed — تتحرك بالـ JS حسب موقع الزر -->
+  <div id="desktopPills">
+    <button class="fab-pill" id="deskPillAppt" onclick="closeFabDial();goToManualForm()">
+      <span class="fab-pill-icon appt">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="17" rx="2.5"/><path d="M3 9h18"/><path d="M8 2v3M16 2v3"/><path d="M9 14.5l1.5 1.5 3-3"/></svg>
+      </span>
+      <span class="fab-pill-label">موعد يدوي</span>
+    </button>
+    <button class="fab-pill" id="deskPillMsgs" onclick="closeFabDial();openMsgCustomizer()">
+      <span class="fab-pill-icon" style="background:linear-gradient(135deg,#0ea5e9,#0284c7);">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+      </span>
+      <span class="fab-pill-label">تخصيص الرسائل</span>
+    </button>
+    <button class="fab-pill" id="deskPillNotes" onclick="closeFabDial();openNotesOverlay()">
+      <span class="fab-pill-icon notes">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+      </span>
+      <span class="fab-pill-label">ملاحظات</span>
+    </button>
+  </div>
+  <!-- الزر الرئيسي فقط -->
+  <div id="desktopSpeedDial">
+    <button class="fab-trigger" id="desktopFabMain" onclick="toggleFabDial()" title="قائمة سريعة">
+      <div class="fab-plus-icon"></div>
+    </button>
+  </div>
+  
+
+  <!-- ========== MODALS ========== -->
+
+
+
+  <!-- Patient Details Modal -->
+  <div id="patientDetailsModal" class="hidden fixed inset-0 z-[150] modal-overlay">
+    <div class="modal-content" style="max-width:none; width:100%; height:100%; max-height:100%; display:flex; flex-direction:column; overflow:hidden; border-radius:0;">
+      <!-- Header -->
+      <div style="padding:14px 18px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);">
+        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
+          <div id="chartAvatar" style="width:46px;height:46px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0;">؟</div>
+          <div style="min-width:0;">
+            <h3 id="modalPatientName" style="font-weight:800;font-size:1.05rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">-</h3>
+            <p id="modalPatientPhone" dir="ltr" style="color:var(--primary);font-size:.85rem;text-align:right;margin-top:1px;"></p>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+          <a id="modalWhatsappBtn" href="#" target="_blank" class="action-btn-small whatsapp-btn"><i class="fab fa-whatsapp"></i></a>
+          <a id="modalCallBtn" href="#" class="action-btn-small call-btn"><i class="fas fa-phone"></i></a>
+          <button onclick="printPatientChart(document.getElementById('patientDetailsModal').dataset.patientId)" title="طباعة الإضبارة (PDF)" style="width:36px;height:36px;border-radius:9px;border:1.5px solid var(--border-strong);background:var(--primary-light);color:var(--primary);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fas fa-print"></i></button>
+          <button id="closePatientDetailsModalBtn" onclick="closePatientDetailsModal()" title="إغلاق" style="width:36px;height:36px;border-radius:9px;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;"><i class="fas fa-times"></i></button>
+        </div>
+      </div>
+      <!-- Body -->
+      <div style="flex:1; overflow-y:auto; padding:20px; background:var(--bg);">
+        <div class="chart-layout">
+
+          <!-- معلومات المريض -->
+          <div class="glass-card chart-info-card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+              <h4 style="font-weight:800;font-size:.9rem;color:var(--primary);margin:0;"><i class="fas fa-id-card" style="margin-left:6px;"></i>معلومات المريض</h4>
+              <button onclick="openPatientInfoEditor(document.getElementById('patientDetailsModal').dataset.patientId)" style="display:inline-flex;align-items:center;gap:5px;font-size:.76rem;font-weight:700;color:var(--primary);background:var(--primary-light);border:1.5px solid var(--border-strong);border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;"><i class="fas fa-pen" style="font-size:.68rem;"></i> تعديل</button>
+            </div>
+            <div id="chartInfoGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"></div>
+          </div>
+
+          <!-- أرشيف الزيارات -->
+          <div class="glass-card" style="padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
+              <h4 style="font-weight:800;font-size:.9rem;color:var(--primary);margin:0;"><i class="fas fa-folder-open" style="margin-left:6px;"></i>أرشيف الزيارات <span id="chartVisitsCount" style="font-size:.72rem;color:var(--text-muted);font-weight:600;"></span></h4>
+              <button onclick="openAddVisitModalFromModal()" class="btn-primary" style="padding:7px 14px;font-size:.8rem;"><i class="fas fa-plus"></i> زيارة جديدة</button>
+            </div>
+            <div id="chartVisitsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+            <div id="modalVisitsTableBody" style="display:none;"></div>
+            <span id="modalPatientBirthDate" style="display:none;"></span><span id="modalPatientAge" style="display:none;"></span><span id="modalPatientAddress" style="display:none;"></span><span id="modalPatientTotalVisits" style="display:none;"></span>
+          </div>
+
+        </div><!-- /chart-layout -->
+      </div>
+    </div>
+  </div>
+
+  <!-- تعديل معلومات المريض (الممرضة: الاسم/الهاتف/تاريخ الميلاد/العنوان فقط) -->
+  <div id="patientInfoModal" class="hidden fixed inset-0 z-[180] flex items-center justify-center p-4 modal-overlay" onclick="if(event.target===this)closePatientInfoEditor()">
+    <div class="modal-content w-full" style="max-width:480px; border-radius:20px; overflow:hidden; display:flex; flex-direction:column; max-height:92vh;">
+      <div style="padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;">
+        <h3 style="font-weight:800;font-size:1rem;color:var(--text);"><i class="fas fa-id-card" style="margin-left:6px;color:var(--primary);"></i> تعديل معلومات المريض</h3>
+        <button onclick="closePatientInfoEditor()" style="width:32px;height:32px;border-radius:8px;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:18px 20px;display:flex;flex-direction:column;gap:14px;overflow-y:auto;">
+        <input type="hidden" id="piPatientId">
+        <div><label class="form-label">الاسم</label><input type="text" id="piName" class="form-input"></div>
+        <div><label class="form-label">رقم الهاتف</label><input type="tel" id="piPhone" class="form-input" dir="ltr"></div>
+        <div><label class="form-label">تاريخ الميلاد <span id="piAgeDisplay" style="color:var(--primary);font-weight:800;"></span></label><input type="date" id="piBirth" class="form-input" style="direction:ltr;" oninput="updatePiAge()"></div>
+        <div><label class="form-label">العنوان</label><input type="text" id="piAddress" class="form-input" placeholder="المدينة / الحي"></div>
+      </div>
+      <div style="padding:14px 20px;border-top:1.5px solid var(--border);display:flex;gap:10px;">
+        <button onclick="closePatientInfoEditor()" class="btn-secondary" style="flex:1;justify-content:center;">إلغاء</button>
+        <button onclick="savePatientInfo()" class="btn-primary" style="flex:1;justify-content:center;">حفظ</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Appointment Details Modal -->
+  <div id="appointmentDetailsModal" class="hidden fixed inset-0 z-[200] flex items-center justify-center p-4 modal-overlay">
+    <div class="modal-content apptd-card w-full" style="max-width:400px;">
+
+      <!-- Header (بطاقة المريض) -->
+      <div class="apptd-head">
+        <button class="apptd-x" onclick="closeAppointmentDetailsModal()" title="إغلاق"><i class="fas fa-times"></i></button>
+        <button id="editApptBtn" class="apptd-edit" onclick="toggleApptEdit()" title="تعديل تاريخ/وقت الموعد"><i class="fas fa-pen"></i></button>
+        <span class="apptd-eyebrow">تفاصيل الموعد</span>
+        <div class="apptd-avatar">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <h3 class="apptd-name" id="appDetailsName">-</h3>
+        <span class="apptd-phone" id="appDetailsPhone" dir="ltr">-</span>
+        <div class="apptd-pills">
+          <span class="apptd-pill"><i class="far fa-clock"></i><span id="slotBadge">-</span></span>
+          <span class="apptd-pill"><i class="far fa-calendar"></i><span id="apptdDatePill">-</span></span>
+          <span class="apptd-pill alt"><i class="fas fa-tag"></i><span id="visitTypeBadge">-</span></span>
+        </div>
+      </div>
+
+      <!-- Body -->
+      <div class="apptd-body">
+        <div class="apptd-grid">
+          <div class="apptd-cell"><span class="apptd-cell-label"><i class="fas fa-hourglass-half"></i>العمر</span><span class="apptd-cell-val" id="appDetailsAge">-</span></div>
+          <div class="apptd-cell"><span class="apptd-cell-label"><i class="far fa-calendar-days"></i>تاريخ الميلاد</span><span class="apptd-cell-val" id="appDetailsBirthDate">-</span></div>
+          <div class="apptd-cell apptd-cell-full"><span class="apptd-cell-label"><i class="fas fa-location-dot"></i>العنوان</span><span class="apptd-cell-val" id="appDetailsAddress">-</span></div>
+        </div>
+
+        <!-- لوحة تعديل تاريخ/وقت الموعد -->
+        <div id="apptEditPanel" style="display:none; margin-top:14px; padding-top:14px; border-top:1.5px dashed var(--border);">
+          <p style="font-weight:800; font-size:.82rem; color:var(--primary); margin-bottom:10px;"><i class="fas fa-pen" style="margin-left:6px;"></i>تعديل تاريخ ووقت الموعد</p>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px;">
+            <div><label class="form-label" style="font-size:.74rem;">التاريخ</label><input type="date" id="editApptDate" class="form-input"></div>
+            <div><label class="form-label" style="font-size:.74rem;">الوقت</label><select id="editApptSlot" class="form-input"></select></div>
+          </div>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button onclick="saveApptEdit()" class="btn-primary" style="flex:1; justify-content:center;"><i class="fas fa-check"></i> حفظ التعديل</button>
+            <button onclick="toggleApptEdit(false)" class="btn-secondary" style="flex:1; justify-content:center;">إلغاء</button>
+          </div>
+        </div>
+
+        <!-- Hidden fields -->
+        <div style="display:none;">
+          <span id="appDetailsVisitType"></span>
+          <span id="appDetailsSlot"></span>
+          <span id="appDetailsDate"></span>
+          <span id="appDetailsPhoneInfo"></span>
+          <span id="agendaCount"></span>
+          <span id="dayStatusBadge"></span>
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="apptd-footer">
+        <button id="deleteAppointmentModalBtn" onclick="deleteApptWithNotify()" class="apptd-btn danger"><i class="fas fa-trash-alt"></i> حذف الموعد</button>
+        <a id="appDetailsWhatsappBtn" href="#" target="_blank" class="apptd-btn wa"><i class="fab fa-whatsapp" style="font-size:1.05rem;"></i> واتساب</a>
+        <button onclick="closeAppointmentDetailsModal()" class="apptd-btn primary">حسناً</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Visit Management Modal -->
+  <div id="visitManagementModal" class="hidden fixed inset-0 z-[180] flex items-center justify-center p-4 modal-overlay">
+    <div class="modal-content max-w-lg w-full">
+      <div style="padding:16px; border-bottom:1.5px solid var(--border);">
+        <h3 style="font-weight:700;">إدارة الزيارات</h3>
+        <p id="visitManagementPatientName" style="font-size:.75rem; color:var(--text-muted); margin-top:4px;"></p>
+      </div>
+      <div id="visitStep1" style="padding:16px; display:flex; flex-direction:column; gap:16px; text-align:center;">
+        <p>هل هذه أول زيارة للمريض؟</p>
+        <div style="display:flex; gap:16px; justify-content:center;">
+          <button id="firstVisitYes" class="btn-primary" style="padding:10px 24px;">نعم، أول زيارة</button>
+          <button id="firstVisitNo" class="btn-secondary" style="padding:10px 24px;">لا، مريض موجود</button>
+        </div>
+      </div>
+      <div id="visitStep2" style="display:none; padding:16px; flex-direction:column; gap:12px;">
+        <p style="font-size:.88rem;">تسجيل مريض جديد:</p>
+        <input type="text" id="visitNewPatientName" class="form-input" placeholder="الاسم">
+        <input type="tel" id="visitNewPatientPhone" class="form-input" placeholder="الهاتف">
+        <input type="date" id="visitNewPatientBirthDate" class="form-input">
+        <input type="text" id="visitNewPatientAddress" class="form-input" placeholder="العنوان">
+        <select id="visitNewPatientVisitType" class="form-input">
+          <option value="كشف جديد">كشف جديد</option>
+          <option value="مراجعة">مراجعة</option>
+          <option value="تحاليل">تحاليل</option>
+        </select>
+        <input type="date" id="visitNewPatientDate" style="display:none;">
+        <select id="visitNewPatientSlot" style="display:none;"></select>
+        <div style="display:flex; gap:8px;">
+          <button id="backToVisitStep1FromNew" class="btn-secondary" style="flex:1;">رجوع</button>
+          <button id="submitNewPatientVisit" class="btn-primary" style="flex:1;">تسجيل</button>
+        </div>
+      </div>
+      <div id="visitStep3" style="display:none; padding:16px; flex-direction:column; gap:12px;">
+        <!-- hidden fields still hold the values from the appointment -->
+        <input type="date" id="existingPatientDate" style="display:none;">
+        <select id="existingPatientSlot" style="display:none;"></select>
+
+        <!-- Search view -->
+        <div id="patientSearchView">
+          <input type="text" id="patientSearchInput" class="form-input" placeholder="ابحث باسم المريض...">
+          <div id="patientSearchResults" style="max-height:240px; overflow-y:auto; display:flex; flex-direction:column; gap:8px; margin-top:10px;"></div>
+          <div style="display:flex; gap:8px; margin-top:12px;">
+            <button id="backToVisitStep1FromSearch" class="btn-secondary" style="flex:1;"><i class="fas fa-arrow-right"></i> رجوع</button>
+          </div>
+        </div>
+
+        <!-- Patient details view (shown after selecting a patient) -->
+        <div id="selectedPatientView" style="display:none; flex-direction:column; gap:12px;">
+          <div id="selectedPatientCard" style="background:var(--primary-light); border:1.5px solid var(--border-strong); border-radius:var(--radius-sm); padding:14px;">
+            <p style="font-weight:700; font-size:1rem; color:var(--text); margin-bottom:10px; border-bottom:1px solid var(--border-strong); padding-bottom:8px;" id="selPatientName"></p>
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; font-size:.82rem;">
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="color:var(--text-muted); font-size:.72rem; font-weight:700;">الهاتف</span>
+                <span style="font-weight:600; color:var(--primary);" id="selPatientPhone"></span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="color:var(--text-muted); font-size:.72rem; font-weight:700;">العمر</span>
+                <span style="font-weight:600;" id="selPatientAge"></span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="color:var(--text-muted); font-size:.72rem; font-weight:700;">أول زيارة</span>
+                <span style="font-weight:600; color:var(--green);" id="selPatientFirstVisit"></span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="color:var(--text-muted); font-size:.72rem; font-weight:700;">آخر زيارة</span>
+                <span style="font-weight:600; color:var(--primary);" id="selPatientLastVisit"></span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="color:var(--text-muted); font-size:.72rem; font-weight:700;">إجمالي الزيارات</span>
+                <span style="font-weight:600;" id="selPatientTotalVisits"></span>
+              </div>
+              <div style="display:flex; flex-direction:column; gap:3px;">
+                <span style="color:var(--text-muted); font-size:.72rem; font-weight:700;">العنوان</span>
+                <span style="font-weight:600;" id="selPatientAddress"></span>
+              </div>
+            </div>
+          </div>
+          <div style="display:flex; gap:8px;">
+            <button id="backToSearchBtn" class="btn-secondary" style="flex:1;" onclick="showSearchView()"><i class="fas fa-arrow-right"></i> العودة للبحث</button>
+            <button id="submitExistingPatientVisit" class="btn-primary" style="flex:1;"><i class="fas fa-plus"></i> إضافة زيارة</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+    <!-- Add Visit Modal -->
+  <div id="addVisitModal" class="hidden fixed inset-0 z-[170] flex items-center justify-center p-4 modal-overlay">
+    <div class="modal-content max-w-md w-full">
+      <div style="padding:16px; border-bottom:1.5px solid var(--border);">
+        <h3 style="font-weight:700;">إضافة زيارة</h3>
+        <p id="addVisitPatientName" style="font-size:.75rem; color:var(--text-muted); margin-top:4px;"></p>
+      </div>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+        <select id="addVisitType" class="form-input">
+          <option value="كشف جديد">كشف جديد</option>
+          <option value="مراجعة">مراجعة</option>
+          <option value="تحاليل">تحاليل</option>
+        </select>
+        <div><label class="form-label">تاريخ الزيارة</label><input type="date" id="addVisitDate" class="form-input"></div>
+        <div><label class="form-label">الوقت</label>
+          <select id="addVisitSlot" class="form-input"></select>
+        </div>
+      </div>
+      <div style="padding:16px; border-top:1.5px solid var(--border); display:flex; gap:10px;">
+        <button id="cancelAddVisitBtn" class="btn-secondary" style="flex:1;">إلغاء</button>
+        <button id="submitAddVisitBtn" class="btn-primary" style="flex:1;">إضافة</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- New Patient Modal -->
+  <div id="patientBookModal" class="hidden fixed inset-0 z-[160] flex items-center justify-center p-4 modal-overlay">
+    <div class="modal-content max-w-md w-full">
+      <div style="padding:16px; border-bottom:1.5px solid var(--border);">
+        <h3 style="font-weight:700;">تسجيل مريض جديد</h3>
+      </div>
+      <div style="padding:16px; display:flex; flex-direction:column; gap:12px;">
+        <input type="text" id="patientBookName" class="form-input" placeholder="الاسم">
+        <input type="tel" id="patientBookPhone" class="form-input" placeholder="الهاتف">
+        <input type="date" id="patientBookBirthDate" class="form-input">
+        <input type="text" id="patientBookAddress" class="form-input" placeholder="العنوان">
+        <select id="patientBookVisitType" class="form-input">
+          <option value="">نوع الزيارة الأولى</option>
+          <option value="كشف جديد">كشف جديد</option>
+          <option value="مراجعة">مراجعة</option>
+          <option value="تحاليل">تحاليل</option>
+        </select>
+        <select id="patientBookSlot" class="form-input"></select>
+      </div>
+      <div style="padding:16px; border-top:1.5px solid var(--border); display:flex; gap:10px;">
+        <button id="cancelPatientBtn" class="btn-secondary" style="flex:1;">إلغاء</button>
+        <button id="submitPatientBookBtn" class="btn-primary" style="flex:1;">تسجيل</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Confirm Delete Modal -->
+  <div id="confirmDeleteModal" class="hidden fixed inset-0 z-[250] flex items-center justify-center p-4 modal-overlay">
+    <div class="modal-content max-w-sm w-full">
+      <div style="padding:16px; border-bottom:1.5px solid var(--border);">
+        <h3 style="font-weight:700;">تأكيد الحذف</h3>
+      </div>
+      <div style="padding:20px; text-align:center;">
+        <i class="fas fa-trash-alt" style="color:var(--red); font-size:2rem; margin-bottom:12px; display:block;"></i>
+        <p>هل أنت متأكد من حذف هذا الموعد نهائياً؟</p>
+      </div>
+      <div style="padding:16px; border-top:1.5px solid var(--border); display:flex; gap:10px;">
+        <button id="confirmDeleteYes" class="btn-danger" style="flex:1;">نعم، احذف</button>
+        <button id="confirmDeleteNo" class="btn-secondary" style="flex:1;">إلغاء</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Day Details Modal -->
+  <div id="dayDetailsModal" class="hidden fixed inset-0 z-[260] flex items-center justify-center p-4 modal-overlay">
+    <div class="modal-content max-w-sm w-full">
+      <div style="padding:18px; border-bottom:1.5px solid var(--border); display:flex; justify-content:space-between; align-items:center;">
+        <h3 id="dayDetailsTitle" style="font-weight:700;">تفاصيل اليوم</h3>
+        <button onclick="closeDayDetailsModal()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.1rem;"><i class="fas fa-times"></i></button>
+      </div>
+      <div style="padding:18px;" id="dayDetailsContent"></div>
+      <div style="padding:18px; border-top:1.5px solid var(--border); display:flex; justify-content:flex-end;">
+        <button onclick="closeDayDetailsModal()" class="btn-primary" style="padding:9px 22px;justify-content:center;text-align:center;">حسناً</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Modal -->
+  <div id="settingsModal" class="hidden settings-page">
+    <div class="settings-sheet">
+
+      <!-- Header -->
+      <div class="settings-hdr">
+        <div style="display:flex;align-items:center;gap:8px;">
+          <button class="settings-hdr-back" onclick="closeSettingsModal()"><i class="fas fa-arrow-right"></i></button>
+          <span class="settings-hdr-title" data-i18n="settings">الإعدادات</span>
+        </div>
+        <button class="settings-hdr-close" onclick="closeSettingsModal()"><i class="fas fa-times"></i></button>
+      </div>
+
+      <!-- Mobile Tabs -->
+      <div class="settings-tabs">
+        <button class="stab active" data-panel="profile" onclick="switchSettingsPanel('profile')">الملف الشخصي</button>
+        <button class="stab" data-panel="schedule" onclick="switchSettingsPanel('schedule')">الدوام</button>
+        <button class="stab" data-panel="offdays" onclick="switchSettingsPanel('offdays')">العطل</button>
+        <button class="stab" data-panel="support" onclick="switchSettingsPanel('support')">الدعم</button>
+      </div>
+
+      <!-- Body -->
+      <div class="settings-body">
+
+        <!-- Sidebar Nav (desktop) -->
+        <nav class="settings-snav">
+          <button class="sni active" data-panel="profile" onclick="switchSettingsPanel('profile')"><i class="fas fa-user-nurse"></i><span>الملف الشخصي</span></button>
+          <button class="sni" data-panel="schedule" onclick="switchSettingsPanel('schedule')"><i class="far fa-clock"></i><span>الدوام والحجز</span></button>
+          <button class="sni" data-panel="offdays" onclick="switchSettingsPanel('offdays')"><i class="fas fa-calendar-xmark"></i><span>أيام العطلة</span></button>
+          <button class="sni" data-panel="support" onclick="switchSettingsPanel('support')"><i class="fas fa-headset"></i><span>الدعم</span></button>
+        </nav>
+
+        <!-- Panels -->
+        <div class="settings-panels">
+
+          <!-- Panel: Profile -->
+          <div class="spanel active" id="spanel-profile">
+            <div class="s-profile">
+              <div class="s-avatar-wrap">
+                <div class="s-avatar" id="logoPreviewContainer">
+                  <span id="logoPreviewIcon"><i class="fas fa-user-nurse"></i></span>
+                  <img id="logoPreviewImg" class="hidden" src="" alt="">
+                </div>
+                <label for="logoFileInput" class="s-avatar-cam" title="تغيير الصورة"><i class="fas fa-camera"></i></label>
+                <input type="file" id="logoFileInput" accept="image/*" class="hidden">
+              </div>
+              <div style="flex:1;min-width:0;">
+                <p style="font-weight:800;font-size:.95rem;color:var(--text);margin-bottom:2px;" id="profileDisplayName">لوحة الممرضة</p>
+                <p style="font-size:.72rem;color:var(--text-muted);margin-bottom:6px;">لوحة الممرضة</p>
+                <button id="removeLogoBtn" class="hidden" onclick="removeLogo()" style="font-size:.72rem;color:var(--red,#dc2626);background:none;border:none;cursor:pointer;font-family:inherit;font-weight:700;display:inline-flex;align-items:center;gap:4px;padding:0;"><i class="fas fa-trash" style="font-size:.65rem;"></i> حذف الصورة</button>
+              </div>
+            </div>
+            <div class="sgroup">
+              <div class="sgroup-label">اسم اللوحة</div>
+              <input type="text" id="settingsTitleInput" class="form-input" placeholder="أدخل الاسم" value="لوحة الممرضة" oninput="document.getElementById('profileDisplayName').textContent=this.value||'لوحة الممرضة'" onchange="autoSaveSettings()">
+            </div>
+            <div class="srow">
+              <div class="srow-label"><i class="fas fa-moon"></i><span data-i18n="night_mode">الوضع الليلي</span></div>
+              <button type="button" id="themeToggleBtn" onclick="toggleTheme()" role="switch" aria-checked="false"
+                style="position:relative;width:48px;height:26px;border-radius:999px;border:none;background:var(--border-strong);cursor:pointer;transition:background .2s;flex-shrink:0;">
+                <span id="themeToggleKnob" style="position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;background:#fff;box-shadow:0 1px 3px rgba(0,0,0,.3);transition:transform .2s;"></span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Panel: Schedule -->
+          <div class="spanel" id="spanel-schedule">
+            <div class="sgroup">
+              <div class="sgroup-label">الفترة الأولى (صباحية)</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                <div>
+                  <label class="form-label" style="font-size:.74rem;margin-bottom:4px;">من</label>
+                  <div style="display:flex;align-items:center;gap:5px;">
+                    <input type="time" id="slotGenFrom" class="form-input" value="08:00" style="direction:ltr;flex:1;" oninput="updateAmPm('slotGenFrom','_ap_f1')" onchange="autoSaveSettings()">
+                    <span id="_ap_f1" style="font-size:.72rem;font-weight:800;color:var(--primary);min-width:14px;text-align:center;">ص</span>
+                  </div>
+                </div>
+                <div>
+                  <label class="form-label" style="font-size:.74rem;margin-bottom:4px;">إلى</label>
+                  <div style="display:flex;align-items:center;gap:5px;">
+                    <input type="time" id="slotGenTo" class="form-input" value="12:00" style="direction:ltr;flex:1;" oninput="updateAmPm('slotGenTo','_ap_t1')" onchange="autoSaveSettings()">
+                    <span id="_ap_t1" style="font-size:.72rem;font-weight:800;color:var(--primary);min-width:14px;text-align:center;">م</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <label style="display:flex;align-items:center;gap:8px;font-size:.82rem;font-weight:700;color:var(--text);cursor:pointer;padding:11px 14px;background:var(--bg);border-radius:12px;border:1.5px solid var(--border);">
+              <input type="checkbox" id="slotGen2Enabled" onchange="toggleSecondPeriod()" style="width:16px;height:16px;accent-color:var(--primary);cursor:pointer;">
+              فترة ثانية (مسائية)
+            </label>
+            <div id="slotGen2Wrap" style="display:none;">
+              <div class="sgroup">
+                <div class="sgroup-label">الفترة الثانية (مسائية)</div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+                  <div>
+                    <label class="form-label" style="font-size:.74rem;margin-bottom:4px;">من</label>
+                    <div style="display:flex;align-items:center;gap:5px;">
+                      <input type="time" id="slotGenFrom2" class="form-input" value="16:00" style="direction:ltr;flex:1;" oninput="updateAmPm('slotGenFrom2','_ap_f2')" onchange="autoSaveSettings()">
+                      <span id="_ap_f2" style="font-size:.72rem;font-weight:800;color:#6366f1;min-width:14px;text-align:center;">م</span>
+                    </div>
+                  </div>
+                  <div>
+                    <label class="form-label" style="font-size:.74rem;margin-bottom:4px;">إلى</label>
+                    <div style="display:flex;align-items:center;gap:5px;">
+                      <input type="time" id="slotGenTo2" class="form-input" value="20:00" style="direction:ltr;flex:1;" oninput="updateAmPm('slotGenTo2','_ap_t2')" onchange="autoSaveSettings()">
+                      <span id="_ap_t2" style="font-size:.72rem;font-weight:800;color:#6366f1;min-width:14px;text-align:center;">م</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="srow">
+              <div class="srow-label"><i class="fas fa-stopwatch"></i>مدة الموعد</div>
+              <select id="slotGenStep" class="form-input" style="width:auto;min-width:110px;" onchange="autoSaveSettings()">
+                <option value="15">15 دقيقة</option><option value="20">20 دقيقة</option><option value="30" selected>30 دقيقة</option><option value="60">60 دقيقة</option>
+              </select>
+            </div>
+            <button type="button" onclick="generateSlots()" class="btn-primary" style="width:100%;justify-content:center;"><i class="fas fa-wand-magic-sparkles"></i> توليد أوقات الحجز</button>
+            <details>
+              <summary style="font-size:.75rem;color:var(--text-muted);cursor:pointer;padding:4px 0;">تعديل يدوي متقدم للأوقات</summary>
+              <textarea id="settingsSlotsInput" class="form-input" rows="3" style="resize:vertical;font-family:'DM Mono',monospace;direction:ltr;text-align:left;margin-top:8px;" placeholder="08:00, 08:30, 09:00 ..." onchange="autoSaveSettings()"></textarea>
+              <div style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin-top:6px;">
+                <p style="font-size:.68rem;color:var(--text-muted);">أوقات مفصولة بفاصلة (HH:MM).</p>
+                <button type="button" onclick="resetSlotSettings()" style="font-size:.72rem;font-weight:700;color:var(--primary);background:var(--primary-light);border:none;border-radius:8px;padding:5px 10px;cursor:pointer;font-family:inherit;">استعادة الافتراضي</button>
+              </div>
+            </details>
+          </div>
+
+          <!-- Panel: Off Days -->
+          <div class="spanel" id="spanel-offdays">
+            <p style="font-size:.82rem;color:var(--text-muted);">أيام العطلة الأسبوعية — يُغلق الحجز فيها تلقائياً:</p>
+            <div id="weeklyOffChips" style="display:flex;flex-wrap:wrap;gap:8px;"></div>
+          </div>
+
+          <!-- Panel: Support -->
+          <div class="spanel" id="spanel-support">
+            <div class="support-header">
+              <img src="nawwa-logo.png" alt="Nawaacodes" class="support-logo" onerror="this.style.display='none';" />
+              <p class="support-name">Nawaacodes</p>
+              <p class="support-sub">الفريق المطور لنظام DocBook</p>
+            </div>
+
+            <!-- معلومات التطبيق -->
+            <div class="support-info-card">
+              <div class="support-info-row">
+                <span class="support-info-label">الإصدار</span>
+                <span class="support-info-val">DocBook Pro v1</span>
+              </div>
+              <div class="support-info-row">
+                <span class="support-info-label">المطوّر</span>
+                <span class="support-info-val">Nawaacodes</span>
+              </div>
+              <div class="support-info-row">
+                <span class="support-info-label">المنصة</span>
+                <span class="support-info-val">Web Application</span>
+              </div>
+              <div class="support-info-row">
+                <span class="support-info-label">قاعدة البيانات</span>
+                <span class="support-info-val">Firebase Firestore</span>
+              </div>
+              <div class="support-info-row">
+                <span class="support-info-label">تسجيل الدخول</span>
+                <span class="support-info-val">Google OAuth 2.0</span>
+              </div>
+            </div>
+
+            <!-- بطاقات التواصل -->
+            <div class="support-cards">
+              <a href="https://wa.me/491773052955" target="_blank" rel="noopener" class="support-card sc-wa">
+                <div class="support-card-icon"><i class="fab fa-whatsapp"></i></div>
+                <div style="flex:1;min-width:0;">
+                  <span class="support-card-title">واتساب</span>
+                  <span class="support-card-sub">+49 177 3052955</span>
+                </div>
+                <button class="copy-btn" onclick="event.preventDefault();copyPhone(this)" title="نسخ الرقم"><i class="far fa-copy"></i></button>
+                <i class="fas fa-chevron-left support-card-arrow"></i>
+              </a>
+              <a href="tel:+491773052955" class="support-card sc-tel">
+                <div class="support-card-icon"><i class="fas fa-phone"></i></div>
+                <div style="flex:1;min-width:0;">
+                  <span class="support-card-title">اتصال مباشر</span>
+                  <span class="support-card-sub">+49 177 3052955</span>
+                </div>
+                <button class="copy-btn" onclick="event.preventDefault();copyPhone(this)" title="نسخ الرقم"><i class="far fa-copy"></i></button>
+                <i class="fas fa-chevron-left support-card-arrow"></i>
+              </a>
+              <a href="https://nawwacodes.online" target="_blank" rel="noopener" class="support-card sc-web">
+                <div class="support-card-icon"><i class="fas fa-globe"></i></div>
+                <div style="flex:1;min-width:0;">
+                  <span class="support-card-title">الموقع الرسمي</span>
+                  <span class="support-card-sub">nawwacodes.online</span>
+                </div>
+                <i class="fas fa-chevron-left support-card-arrow"></i>
+              </a>
+            </div>
+
+            <!-- سياسة الخصوصية -->
+            <div class="support-cards" style="margin-top:10px;">
+              <div class="support-card sc-prv" style="cursor:pointer;" onclick="document.getElementById('privacyReadModal').style.display='block'">
+                <div class="support-card-icon"><i class="fas fa-lock"></i></div>
+                <div style="flex:1;min-width:0;">
+                  <span class="support-card-title">سياسة الخصوصية</span>
+                  <span class="support-card-sub">اقرأ شروط الاستخدام</span>
+                </div>
+                <i class="fas fa-chevron-left support-card-arrow"></i>
+              </div>
+            </div>
+
+            <!-- الأسئلة الشائعة -->
+            <div class="support-faq-section">
+              <p class="faq-section-title"><i class="fas fa-wrench"></i>تقني</p>
+              <div class="faq-item">
+                <div class="faq-q">هل يمكن استخدام النظام من أكثر من جهاز؟</div>
+                <div class="faq-a"><div class="faq-a-inner">نعم، من أي متصفح بنفس حساب جوجل المُستخدم عند التسجيل الأول.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">هل يعمل النظام بدون إنترنت؟</div>
+                <div class="faq-a"><div class="faq-a-inner">لا، يتطلب اتصالاً مستمراً لأن البيانات مخزّنة على السحابة في الوقت الفعلي.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">كيف أضيف ممرضة للنظام؟</div>
+                <div class="faq-a"><div class="faq-a-inner">من إعدادات العيادة أضف البريد الإلكتروني للممرضة لمنحها صلاحية الوصول.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">كيف أسجّل الدخول من جهاز جديد؟</div>
+                <div class="faq-a"><div class="faq-a-inner">بنفس حساب جوجل المُستخدم عند التسجيل الأول — لا حاجة لأي إعداد إضافي.</div></div>
+              </div>
+
+              <p class="faq-section-title" style="margin-top:14px;"><i class="fas fa-shield-alt"></i>الأمان</p>
+              <div class="faq-item">
+                <div class="faq-q">هل بيانات المرضى محفوظة بأمان؟</div>
+                <div class="faq-a"><div class="faq-a-inner">نعم، مخزّنة في Firebase المرتبط بحسابك الشخصي — لا يملك أي طرف خارجي صلاحية الوصول إليها.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">من يملك صلاحية الوصول إلى بياناتي؟</div>
+                <div class="faq-a"><div class="faq-a-inner">أنت فقط عبر حساب جوجل الخاص بك. لا تملك Nawaacodes أي صلاحية للاطلاع على بيانات العيادة.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">هل الفريق المطور يستطيع رؤية البيانات؟</div>
+                <div class="faq-a"><div class="faq-a-inner">لا، قاعدة البيانات مرتبطة بحسابك حصراً ولا يمكن لأحد الوصول إليها.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">ماذا يحدث لبياناتي إذا توقفت عن الاستخدام؟</div>
+                <div class="faq-a"><div class="faq-a-inner">تبقى محفوظة في حسابك على Firebase ما لم تقم بحذفها يدوياً.</div></div>
+              </div>
+
+              <p class="faq-section-title" style="margin-top:14px;"><i class="fas fa-info-circle"></i>معلومات التطبيق</p>
+              <div class="faq-item">
+                <div class="faq-q">ما هو الإصدار الحالي من DocBook؟</div>
+                <div class="faq-a"><div class="faq-a-inner">الإصدار الحالي هو DocBook Pro v1، مطوَّر بالكامل من قِبل Nawaacodes.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">على أي منصة يعمل النظام؟</div>
+                <div class="faq-a"><div class="faq-a-inner">تطبيق ويب يعمل على جميع المتصفحات الحديثة — Chrome وSafari وEdge وغيرها.</div></div>
+              </div>
+              <div class="faq-item">
+                <div class="faq-q">كيف يتم تسجيل الدخول؟</div>
+                <div class="faq-a"><div class="faq-a-inner">عبر Google OAuth 2.0 — لا توجد كلمة مرور منفصلة، يكفي حساب جوجل الخاص بك.</div></div>
+              </div>
+            </div>
+
+            <p class="support-copy">© 2026 Nawaacodes — جميع الحقوق محفوظة</p>
+          </div>
+
+        </div>
+      </div>
+
+      <!-- Footer -->
+      <div class="settings-ftr">
+        <button class="s-btn-logout" onclick="docbookSignOut()"><i class="fas fa-sign-out-alt"></i><span data-i18n="logout">تسجيل الخروج</span></button>
+        <button onclick="closeSettingsModal()" class="btn-secondary" style="flex:1;justify-content:center;" data-i18n="cancel">إغلاق</button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ========== NOTES OVERLAY ========== -->
+  <div id="notesOverlay" style="display:none; position:fixed; inset:0; z-index:400; background:rgba(19,78,74,0.35); backdrop-filter:blur(4px); align-items:center; justify-content:center; padding:20px; animation:overlayFadeIn .2s ease;" onclick="if(event.target===this)closeNotesOverlay()">
+    <div id="notesPanel" style="background:var(--surface); border:1.5px solid var(--border); border-radius:var(--radius-xl); box-shadow:var(--shadow-lg); width:100%; max-width:860px; max-height:92vh; height:92vh; overflow:hidden; position:relative; animation:panelSlideUp .25s cubic-bezier(.34,1.56,.64,1); display:flex; flex-direction:column;">
+      <!-- Header -->
+      <div style="padding:20px 24px 16px; border-bottom:1.5px solid var(--border); display:flex; align-items:center; justify-content:space-between; flex-shrink:0;">
+        <div style="display:flex; align-items:center; gap:12px;">
+          <div style="width:40px; height:40px; border-radius:12px; background:linear-gradient(135deg,#ede9fe,#ddd6fe); border:1.5px solid #c4b5fd; display:flex; align-items:center; justify-content:center;">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+          </div>
+          <div>
+            <div style="font-weight:800; font-size:1rem;">دفتر الملاحظات</div>
+            <div style="font-size:.72rem; color:var(--text-muted);" id="notesCountLabel">٠ ملاحظة</div>
+          </div>
+        </div>
+        <button onclick="closeNotesOverlay()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);font-size:1.2rem; padding:4px 8px; border-radius:8px; transition:background .15s;" onmouseover="this.style.background='var(--bg)'" onmouseout="this.style.background='none'"><i class="fas fa-times"></i></button>
+      </div>
+
+      <!-- Search + Add -->
+      <div style="padding:14px 24px; border-bottom:1.5px solid var(--border); display:flex; gap:10px; flex-shrink:0;">
+        <div class="search-wrapper" style="flex:1; margin-bottom:0;">
+          <i class="fas fa-search search-icon"></i>
+          <input type="text" id="notesSearchInput" class="search-input" placeholder="ابحث في الملاحظات..." oninput="renderNotes()">
+        </div>
+        <button onclick="showAddNoteForm()" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:var(--radius-sm); padding:0 16px; font-weight:700; font-size:.82rem; cursor:pointer; display:flex; align-items:center; gap:6px; white-space:nowrap; transition:opacity .15s; box-shadow:0 2px 8px rgba(217,119,6,.3);" onmouseover="this.style.opacity='.88'" onmouseout="this.style.opacity='1'">
+          <i class="fas fa-plus"></i> ملاحظة جديدة
+        </button>
+      </div>
+
+      <!-- Add note form (hidden by default) -->
+      <div id="addNoteForm" style="display:none; padding:16px 24px; border-bottom:1.5px solid #fde68a; background:#fefce8; flex-shrink:0;">
+        <textarea id="noteTextInput" class="form-input" rows="3" placeholder="اكتب ملاحظتك هنا..." style="resize:vertical; min-height:80px; width:100%; box-sizing:border-box; border-color:#fde68a; background:#fffbeb;"></textarea>
+        <div style="display:flex; gap:8px; margin-top:10px; justify-content:flex-end;">
+          <button onclick="hideAddNoteForm()" class="btn-secondary" style="padding:8px 18px;">إلغاء</button>
+          <button onclick="saveNote()" style="background:linear-gradient(135deg,#f59e0b,#d97706); color:white; border:none; border-radius:var(--radius-sm); padding:8px 20px; font-weight:700; cursor:pointer; box-shadow:0 2px 8px rgba(217,119,6,.3);">حفظ</button>
+        </div>
+      </div>
+
+      <!-- Notes list -->
+      <div id="notesList" style="padding:16px 24px; display:flex; flex-direction:column; gap:10px; flex:1; overflow-y:auto; min-height:0;">
+        <div id="notesEmpty" style="text-align:center; padding:32px 0; color:var(--text-muted);">
+          <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin:0 auto 10px; display:block; opacity:.35;"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+          <p style="font-size:.85rem; font-weight:600;">لا توجد ملاحظات بعد</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ========== MANUAL FORM OVERLAY (desktop) ========== -->
+  <div id="manualFormOverlay" onclick="handleOverlayClick(event)">
+    <div id="manualFormPanel">
+      <button id="manualFormOverlayCloseBtn" onclick="closeManualFormOverlay()" title="إغلاق">
+        <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+
+      <div style="display:flex; align-items:center; gap:12px; margin-bottom:20px; padding-top:4px;">
+        <div class="card-icon"><i class="fas fa-pen-to-square"></i></div>
+        <div>
+          <div class="card-title">تسجيل موعد يدوي</div>
+          <div class="card-subtitle">للمرضى الذين يحجزون مباشرة في العيادة</div>
+        </div>
+      </div>
+
+      <!-- Step indicator (mobile only) -->
+      <div class="form-step-indicator" id="overlayStepIndicator">
+        <div class="step-dot-wrapper active" id="overlayStep1Wrapper">
+          <div class="step-dot active" id="overlayStep1Dot">1</div>
+          <span class="step-dot-label">البيانات</span>
+        </div>
+        <div class="step-dot-connector" id="overlayConnector1"></div>
+        <div class="step-dot-wrapper" id="overlayStep2Wrapper">
+          <div class="step-dot" id="overlayStep2Dot">2</div>
+          <span class="step-dot-label">الموعد</span>
+        </div>
+        <div class="step-dot-connector" id="overlayConnector2"></div>
+        <div class="step-dot-wrapper" id="overlayStep3Wrapper">
+          <div class="step-dot" id="overlayStep3Dot">3</div>
+          <span class="step-dot-label">تأكيد</span>
+        </div>
+      </div>
+
+      <!-- Desktop 3-column grid / Mobile: transparent wrapper -->
+      <div id="oDesktopGrid">
+
+        <!-- ── COL 1: البيانات ── -->
+        <div class="o-step-col">
+          <div class="o-step-col-title">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:white;font-weight:800;font-size:.8rem;">1</span></div>
+            <span style="font-weight:700;font-size:.9rem;color:var(--text);">بيانات المريض</span>
+          </div>
+
+      <!-- Step 1 -->
+      <div id="overlayStep1" class="form-step active">
+        <div style="display:flex; flex-direction:column; gap:16px;">
+          <div><label class="form-label">اسم المريض الكامل</label><input type="text" id="oManualPatientName" class="form-input" placeholder="أدخل الاسم الكامل"></div>
+          <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px;">
+            <div><label class="form-label">رقم الهاتف</label><input type="tel" id="oManualPhone" class="form-input" placeholder="05xxxxxxxx"></div>
+            <div><label class="form-label">تاريخ الميلاد</label><input type="date" id="oManualBirthDate" class="form-input"></div>
+          </div>
+          <div><label class="form-label">العنوان</label><input type="text" id="oManualAddress" class="form-input" placeholder="اختياري"></div>
+          <div><label class="form-label">نوع الزيارة</label>
+            <select id="oManualVisitType" class="form-input">
+              <option value="">اختر نوع الزيارة</option>
+              <option value="كشف جديد">كشف جديد</option>
+              <option value="مراجعة">مراجعة</option>
+              <option value="تحاليل">تحاليل</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-navigation">
+          <div></div>
+          <button id="oNextToStep2" class="btn-primary">التالي <i class="fas fa-arrow-left"></i></button>
+        </div>
+      </div>
+        </div><!-- /o-step-col 1 -->
+
+        <!-- ── COL 2: الموعد ── -->
+        <div class="o-step-col">
+          <div class="o-step-col-title">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:white;font-weight:800;font-size:.8rem;">2</span></div>
+            <span style="font-weight:700;font-size:.9rem;color:var(--text);">اختيار الموعد</span>
+          </div>
+
+      <!-- Step 2 — Calendar Picker -->
+      <div id="overlayStep2" class="form-step">
+        <input type="hidden" id="oManualDateInput">
+
+        <!-- Calendar — same design as main calendar -->
+        <div class="compact-calendar-container" style="margin-bottom:12px; padding:14px !important;">
+          <div class="compact-calendar-header" style="margin-bottom:10px;">
+            <button onclick="oPrevMonth()" class="compact-nav-btn" type="button"><i class="fas fa-chevron-right"></i></button>
+            <div style="text-align:center;">
+              <span id="oCalMonth" style="font-weight:700; font-size:.92rem; color:var(--text);"></span>
+              <div class="density-legend" style="margin-top:3px;">
+                <div style="display:flex;align-items:center;gap:4px;"><div style="width:7px;height:7px;border-radius:50%;background:#2563eb;"></div><span>خفيف</span></div>
+                <div style="display:flex;align-items:center;gap:4px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--amber);"></div><span>متوسط</span></div>
+                <div style="display:flex;align-items:center;gap:4px;"><div style="width:7px;height:7px;border-radius:50%;background:var(--red);"></div><span>مزدحم</span></div>
+              </div>
+            </div>
+            <button onclick="oNextMonth()" class="compact-nav-btn" type="button"><i class="fas fa-chevron-left"></i></button>
+          </div>
+          <div class="compact-calendar-grid" style="margin-bottom:6px;">
+            <div class="compact-calendar-day-name">الجمعة</div>
+            <div class="compact-calendar-day-name">السبت</div>
+            <div class="compact-calendar-day-name">الأحد</div>
+            <div class="compact-calendar-day-name">الإثنين</div>
+            <div class="compact-calendar-day-name">الثلاثاء</div>
+            <div class="compact-calendar-day-name">الأربعاء</div>
+            <div class="compact-calendar-day-name">الخميس</div>
+          </div>
+          <div id="oCalGrid" class="compact-calendar-grid"></div>
+        </div>
+
+        <!-- Selected day info -->
+        <div id="oSelectedDayInfo" class="hidden" style="margin-bottom:12px;">
+          <p style="font-weight:700; font-size:.82rem; color:var(--primary); margin-bottom:8px; display:flex; align-items:center; gap:6px;">
+            <i class="fas fa-calendar-day"></i>
+            <span id="oSelectedDayLabel"></span>
+          </p>
+
+          <!-- Morning section -->
+          <div style="margin-bottom:8px;">
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+              <i class="fas fa-sun" style="color:#d97706; font-size:.75rem;"></i>
+              <span style="font-weight:700; font-size:.78rem; color:var(--text);">الصباح</span>
+              <span id="oMorningCount" style="background:#fef3c7; color:#d97706; padding:1px 8px; border-radius:20px; font-size:.65rem; font-weight:700;">0</span>
+            </div>
+            <div id="oMorningPatients" style="display:flex; flex-direction:column; gap:5px;"></div>
+          </div>
+
+          <!-- Evening section -->
+          <div>
+            <div style="display:flex; align-items:center; gap:6px; margin-bottom:6px;">
+              <i class="fas fa-moon" style="color:#6366f1; font-size:.75rem;"></i>
+              <span style="font-weight:700; font-size:.78rem; color:var(--text);">المساء</span>
+              <span id="oEveningCount" style="background:#ede9fe; color:#6366f1; padding:1px 8px; border-radius:20px; font-size:.65rem; font-weight:700;">0</span>
+            </div>
+            <div id="oEveningPatients" style="display:flex; flex-direction:column; gap:5px;"></div>
+          </div>
+        </div>
+
+        <!-- Slot selector (appears after day selected) -->
+        <div id="oSlotSelectorWrapper" class="hidden" style="margin-bottom:12px;">
+          <label class="form-label" style="margin-bottom:6px;"><i class="far fa-clock" style="margin-left:5px; color:var(--primary);"></i>اختر الوقت</label>
+          <select id="oSlotSelect" class="form-input" onchange="oSelectSlot(this.value)"></select>
+        </div>
+
+        <div id="oClosedDayWarning" class="hidden" style="background:var(--red-light);color:var(--red);border-radius:var(--radius-sm);padding:10px 14px;font-size:.82rem;margin-bottom:8px;"><i class="fas fa-ban" style="margin-left:6px;"></i>هذا اليوم مغلق للحجز، يرجى اختيار يوم آخر</div>
+
+        <div class="form-summary" style="margin-bottom:4px;">
+          <div style="display:flex; justify-content:space-between; margin-bottom:6px;">
+            <span style="color:var(--text-muted); font-size:.82rem;">المريض:</span>
+            <span id="oSummaryPatientName" style="font-weight:600;">-</span>
+          </div>
+          <div style="display:flex; justify-content:space-between;">
+            <span style="color:var(--text-muted); font-size:.82rem;">العمر:</span>
+            <span id="oSummaryAge" style="font-weight:600;">-</span>
+          </div>
+        </div>
+
+        <div class="form-navigation">
+          <button id="oBackToStep1" class="btn-secondary"><i class="fas fa-arrow-right"></i> السابق</button>
+          <button id="oNextToStep3" class="btn-primary">التالي <i class="fas fa-arrow-left"></i></button>
+        </div>
+      </div>
+        </div><!-- /o-step-col 2 -->
+
+        <!-- ── COL 3: التأكيد ── -->
+        <div class="o-step-col">
+          <div class="o-step-col-title">
+            <div style="width:28px;height:28px;border-radius:50%;background:var(--primary);display:flex;align-items:center;justify-content:center;flex-shrink:0;"><span style="color:white;font-weight:800;font-size:.8rem;">3</span></div>
+            <span style="font-weight:700;font-size:.9rem;color:var(--text);">تأكيد الحجز</span>
+          </div>
+
+      <!-- Step 3 -->
+      <div id="overlayStep3" class="form-step">
+        <div style="background:var(--primary-light); border:1.5px solid var(--border-strong); border-radius:var(--radius); padding:18px; margin-bottom:16px;">
+          <h3 style="font-weight:700; font-size:.95rem; margin-bottom:12px; color:var(--primary);">تأكيد الحجز</h3>
+          <div style="display:flex; flex-direction:column; gap:8px; font-size:.88rem;">
+            <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">الاسم:</span><span id="oConfirmPatientName" style="font-weight:600;"></span></div>
+            <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">الهاتف:</span><span id="oConfirmPhone" style="font-weight:600;"></span></div>
+            <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">النوع:</span><span id="oConfirmVisitType" style="font-weight:600;"></span></div>
+            <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">التاريخ:</span><span id="oConfirmDate" style="font-weight:600;"></span></div>
+            <div style="display:flex; justify-content:space-between;"><span style="color:var(--text-muted);">الفترة:</span><span id="oConfirmSlot" style="font-weight:600;"></span></div>
+          </div>
+        </div>
+        <div class="form-navigation">
+          <button id="oBackToStep2" class="btn-secondary"><i class="fas fa-arrow-right"></i> السابق</button>
+          <button id="oSubmitManualAppointment" class="btn-primary" style="background:linear-gradient(135deg,#059669,#10b981)!important;">تسجيل الموعد</button>
+        </div>
+      </div>
+        </div><!-- /o-step-col 3 -->
+
+      </div><!-- /oDesktopGrid -->
+
+    </div><!-- /manualFormPanel -->
+  </div><!-- /manualFormOverlay -->
+
+  <!-- ========== NOTES JAVASCRIPT ========== -->
+
+  <!-- Footer -->
+
+
+  <!-- ===== بانر تنبيه الدكتور ===== -->
+  <div id="doctorAlertBanner">
+    <div class="alert-banner-inner" id="alertBannerInner">
+      <div class="alert-banner-icon" id="alertBannerIcon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="26" height="26"><circle cx="9" cy="7" r="3"/><path d="M6 21v-2a4 4 0 014-4h1"/><path d="M16 17l4-4-4-4M20 13h-7"/></svg>
+      </div>
+      <div class="alert-banner-text">
+        <div class="alert-banner-title" id="alertBannerTitle">أدخل المريض</div>
+        <div class="alert-banner-sub"  id="alertBannerSub">تنبيه من الدكتور</div>
+      </div>
+      <button class="alert-banner-close" onclick="closeDoctorAlert()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="14" height="14"><path d="M18 6L6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+  </div>
+
+  <!-- ===== JS: استقبال تنبيهات الدكتور + عداد الوقت ===== -->
+  
+
+
+
+
+
+  <!-- Confirm Bottom-Sheet -->
+  <div id="confirmSheet">
+    <div class="sheet-box">
+      <p id="confirmSheetMsg" style="font-weight:700;font-size:.95rem;color:var(--text);margin-bottom:18px;text-align:center;line-height:1.5;"></p>
+      <div style="display:flex;gap:10px;">
+        <button onclick="_confirmSheetCancel()" style="flex:1;padding:11px;border:1.5px solid var(--border);border-radius:12px;background:var(--bg);color:var(--text-muted);font-weight:700;font-size:.88rem;font-family:inherit;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='var(--surface)'" onmouseout="this.style.background='var(--bg)'">إلغاء</button>
+        <button id="confirmSheetOk" onclick="_confirmSheetOk()" style="flex:1;padding:11px;border:none;border-radius:12px;background:var(--red);color:white;font-weight:800;font-size:.88rem;font-family:inherit;cursor:pointer;transition:background .15s;" onmouseover="this.style.background='#b91c1c'" onmouseout="this.style.background='var(--red)'">تأكيد</button>
+      </div>
+    </div>
+  </div>
+  <!-- إشعار طلب جديد -->
+  <div id="notifToast"></div>
+
+  <!-- ══ مودال تخصيص الرسائل ══ -->
+  <div id="msgCustomizerModal" class="hidden fixed inset-0 z-[300] flex items-center justify-center p-4 modal-overlay" onclick="if(event.target===this)closeMsgCustomizer()">
+    <div class="modal-content w-full" style="max-width:860px;height:92vh;max-height:92vh;border-radius:var(--radius-xl,20px);overflow:hidden;display:flex;flex-direction:column;">
+      <div style="padding:16px 20px;border-bottom:1.5px solid var(--border);display:flex;justify-content:space-between;align-items:center;flex-shrink:0;">
+        <h3 style="font-weight:800;font-size:1rem;color:var(--text-primary);">تخصيص رسائل المريض</h3>
+        <button onclick="closeMsgCustomizer()" style="background:none;border:none;cursor:pointer;color:var(--text-muted);">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+      </div>
+      <div style="overflow-y:auto;padding:16px 20px;flex:1;">
+
+        <!-- قبول الموعد -->
+        <div class="msg-card" id="msgCard_confirm">
+          <div class="msg-card-header">
+            <span class="msg-card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg> رسالة قبول الموعد</span>
+            <span class="msg-card-badge msg-badge-confirm">عند القبول</span>
+          </div>
+          <div class="msg-preview" id="msgPreview_confirm"></div>
+          <div class="msg-vars">المتغيرات: {اسم} {تاريخ} {فترة} {نوع}</div>
+          <textarea class="msg-textarea" id="msgEdit_confirm" placeholder="اكتب نص الرسالة..."></textarea>
+          <div class="msg-btns">
+            <button class="btn-msg-reset" onclick="resetMsg('confirm')">إعادة تعيين</button>
+            <button class="btn-msg-edit" onclick="toggleMsgEdit('confirm')" id="msgEditBtn_confirm">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              تعديل
+            </button>
+            <button class="btn-msg-save" onclick="saveMsg('confirm')" id="msgSaveBtn_confirm" style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              حفظ
+            </button>
+          </div>
+        </div>
+
+        <!-- رفض الموعد -->
+        <div class="msg-card" id="msgCard_reject">
+          <div class="msg-card-header">
+            <span class="msg-card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg> رسالة رفض الموعد</span>
+            <span class="msg-card-badge msg-badge-reject">عند الرفض</span>
+          </div>
+          <div class="msg-preview" id="msgPreview_reject"></div>
+          <div class="msg-vars">المتغيرات: {اسم} {تاريخ}</div>
+          <textarea class="msg-textarea" id="msgEdit_reject" placeholder="اكتب نص الرسالة..."></textarea>
+          <div class="msg-btns">
+            <button class="btn-msg-reset" onclick="resetMsg('reject')">إعادة تعيين</button>
+            <button class="btn-msg-edit" onclick="toggleMsgEdit('reject')" id="msgEditBtn_reject">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              تعديل
+            </button>
+            <button class="btn-msg-save" onclick="saveMsg('reject')" id="msgSaveBtn_reject" style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              حفظ
+            </button>
+          </div>
+        </div>
+
+        <!-- إلغاء الموعد -->
+        <div class="msg-card" id="msgCard_cancel">
+          <div class="msg-card-header">
+            <span class="msg-card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#d97706" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="4.93" y1="4.93" x2="19.07" y2="19.07"/></svg> رسالة إلغاء الموعد</span>
+            <span class="msg-card-badge msg-badge-cancel">عند الإلغاء</span>
+          </div>
+          <div class="msg-preview" id="msgPreview_cancel"></div>
+          <div class="msg-vars">المتغيرات: {اسم} {تاريخ}</div>
+          <textarea class="msg-textarea" id="msgEdit_cancel" placeholder="اكتب نص الرسالة..."></textarea>
+          <div class="msg-btns">
+            <button class="btn-msg-reset" onclick="resetMsg('cancel')">إعادة تعيين</button>
+            <button class="btn-msg-edit" onclick="toggleMsgEdit('cancel')" id="msgEditBtn_cancel">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              تعديل
+            </button>
+            <button class="btn-msg-save" onclick="saveMsg('cancel')" id="msgSaveBtn_cancel" style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              حفظ
+            </button>
+          </div>
+        </div>
+
+        <!-- تذكير موعد -->
+        <div class="msg-card" id="msgCard_reminder">
+          <div class="msg-card-header">
+            <span class="msg-card-title"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg> رسالة تذكير الموعد</span>
+            <span class="msg-card-badge msg-badge-reminder">عند التذكير</span>
+          </div>
+          <div class="msg-preview" id="msgPreview_reminder"></div>
+          <div class="msg-vars">المتغيرات: {اسم} {تاريخ} {فترة} {نوع}</div>
+          <textarea class="msg-textarea" id="msgEdit_reminder" placeholder="اكتب نص الرسالة..."></textarea>
+          <div class="msg-btns">
+            <button class="btn-msg-reset" onclick="resetMsg('reminder')">إعادة تعيين</button>
+            <button class="btn-msg-edit" onclick="toggleMsgEdit('reminder')" id="msgEditBtn_reminder">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+              تعديل
+            </button>
+            <button class="btn-msg-save" onclick="saveMsg('reminder')" id="msgSaveBtn_reminder" style="display:none;">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              حفظ
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Privacy Policy Modal (read-only) -->
+  <div id="privacyReadModal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.52);backdrop-filter:blur(4px);overflow-y:auto;padding:20px;" onclick="if(event.target===this)this.style.display='none'">
+    <div class="prm-card">
+      <div class="prm-head">
+        <h3 class="prm-title">سياسة الخصوصية وشروط الاستخدام</h3>
+        <button class="prm-close" onclick="document.getElementById('privacyReadModal').style.display='none'">×</button>
+      </div>
+      <div class="prm-body">
+        <div class="faq-item">
+          <div class="faq-q">١ — إخلاء المسؤولية الطبية</div>
+          <div class="faq-a"><div class="faq-a-inner">تُقدّم منصة DocBook خدمات إدارية وتنظيمية بحتة، ولا تُعدّ بأي حال جهةً طبية أو داعمةً لاتخاذ قرارات علاجية. جميع القرارات الطبية تقع على عاتق الطبيب والكادر الصحي المرخّص حصراً. لا يتحمل الفريق المطور أي مسؤولية قانونية أو مدنية ناجمة عن أي ضرر طبي يصيب المريض.</div></div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">٢ — توزيع المسؤولية في معالجة البيانات</div>
+          <div class="faq-a"><div class="faq-a-inner">تعمل العيادة بصفة "مالك البيانات" (Data Controller) وهي المسؤولة الوحيدة عن الحصول على موافقة المرضى وضمان مشروعية جمع بياناتهم. أما الفريق المطور فيعمل بصفة "معالج البيانات" (Data Processor) فحسب.</div></div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">٣ — مسؤولية العميل عن صحة الاستخدام</div>
+          <div class="faq-a"><div class="faq-a-inner">يتحمل العميل مسؤولية كاملة عن دقة البيانات المُدخلة في النظام، وسلامة بيانات الوصول وعدم مشاركتها مع أطراف غير مصرّح لهم، والاستخدام المتوافق مع الأنظمة والقوانين المحلية النافذة.</div></div>
+        </div>
+        <div class="faq-item">
+          <div class="faq-q">٤ — استقلالية قاعدة البيانات وانعدام صلاحيات الفريق المطور</div>
+          <div class="faq-a"><div class="faq-a-inner">تُبنى قاعدة البيانات حصرياً على حساب Firebase الخاص بالعميل. لا يمتلك الفريق المطور أي صلاحيات وصول إلى مشروع Firebase، ولا يستطيع تقنياً ولا قانونياً الاطلاع على أي بيانات مُدخلة أو تعديلها أو حذفها.</div></div>
+        </div>
+      </div>
+      <p class="prm-copy">© 2026 Nawaacodes — جميع الحقوق محفوظة</p>
+    </div>
+  </div>
+
+  <script src="config.js"></script>
+  <script src="script.js"></script>
+  <script>
+    function copyPhone(btn) {
+      navigator.clipboard.writeText('+491773052955').then(function() {
+        var orig = btn.innerHTML;
+        btn.innerHTML = '<i class="fas fa-check"></i>';
+        btn.style.color = '#10b981';
+        setTimeout(function() { btn.innerHTML = orig; btn.style.color = ''; }, 1500);
+      }).catch(function() {});
+    }
+    document.querySelectorAll('.faq-q').forEach(function(q) {
+      q.addEventListener('click', function() {
+        this.closest('.faq-item').classList.toggle('open');
+      });
+    });
+  </script>
+</body>
+</html>

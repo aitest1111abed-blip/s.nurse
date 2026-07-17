@@ -1,0 +1,19 @@
+{
+  "id": "docbook-nurse-v1",
+  "name": "DocBook — لوحة الممرضة",
+  "short_name": "DocBook ممرضة",
+  "description": "نظام إدارة العيادة — لوحة الممرضة",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#0d9488",
+  "lang": "ar",
+  "dir": "rtl",
+  "categories": ["medical"],
+  "icons": [
+    { "src": "./icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "./icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" }
+  ]
+}
