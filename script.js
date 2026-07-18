@@ -861,10 +861,18 @@
         if (snap.exists()) { settings = snap.data(); applySettings(); }
       }).catch(function(){});
 
-      // معلومات الطبيب/العيادة (يسجّلها الطبيب) — تُستخدم في طباعة الإضبارة
-      window._fb.getDoc('settings', 'doctor').then(function(snap) {
-        if (snap.exists()) { _docSettings = snap.data() || {}; try { localStorage.setItem('doctorSettings', JSON.stringify(_docSettings)); } catch(e){} }
-      }).catch(function(){});
+      // معلومات الطبيب/العيادة + قالب الحقول المخصّصة (يسجّلها الطبيب) — مستمع لحظي
+      // ليظهر للممرّضة أي تعديل من الطبيب (خانات جديدة/تعديل) دون إعادة تحميل.
+      window._fb.onSnapshot(window._fb.docRef('settings', 'doctor'), function(snap) {
+        if (!snap.exists()) return;
+        _docSettings = snap.data() || {};
+        try { localStorage.setItem('doctorSettings', JSON.stringify(_docSettings)); } catch(e){}
+        // إن كانت اضبارة مريض مفتوحة، حدّث عرض حقوله المخصّصة فوراً
+        var _pdm = document.getElementById('patientDetailsModal');
+        if (_pdm && !_pdm.classList.contains('hidden') && _pdm.dataset.patientId && typeof openPatientDetailsModal === 'function') {
+          try { openPatientDetailsModal(_pdm.dataset.patientId); } catch(e){}
+        }
+      }, function(){});
 
       // إشعار "طلب جديد" مدمج الآن داخل مُراقب appointments الرئيسي أعلاه (مُراقب واحد لتقليل القراءات)
     }
@@ -1895,6 +1903,7 @@
         + chip('زمرة الدم', p.bloodType ? escapeHtml(p.bloodType) : '-', p.bloodType ? '#dc2626' : 'var(--text-muted)')
         + chip('العنوان', escapeHtml(p.address || '-'))
         + chip('إجمالي الزيارات', String(p.totalVisits || (p.appointments ? p.appointments.length : 0)))
+        + renderPatientCustomChips(p.custom)   // حقول المريض المخصّصة (قالب الطبيب المشترك)
         + '<div style="grid-column:1/-1;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;min-width:0;">'
           + '<div style="font-size:.68rem;color:var(--text-muted);font-weight:600;margin-bottom:2px;">أمراض مزمنة</div>'
           + '<div style="font-size:.86rem;font-weight:700;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;max-height:160px;overflow-y:auto;color:' + (p.chronicDiseases ? '#d97706' : 'var(--text-muted)') + ';">' + escapeHtml(p.chronicDiseases || 'لا يوجد') + '</div></div>';
@@ -2052,6 +2061,7 @@
       document.getElementById('piPhone').value   = p.phone || '';
       document.getElementById('piBirth').value   = p.birthDate || '';
       document.getElementById('piAddress').value = p.address || '';
+      buildCustomFieldInputs(document.getElementById('piCustomFields'), getChartTemplate().patient, p.custom, 'حقول مخصّصة');
       updatePiAge();
       document.getElementById('patientInfoModal').classList.remove('hidden');
     };
@@ -2069,7 +2079,8 @@
       p.phone     = document.getElementById('piPhone').value.trim();
       p.birthDate = document.getElementById('piBirth').value;
       p.address   = document.getElementById('piAddress').value.trim();
-      updatePatient(pid, { name: p.name, phone: p.phone, birthDate: p.birthDate, address: p.address });
+      p.custom    = readCustomFieldInputs(document.getElementById('piCustomFields'));   // حقول المريض المخصّصة
+      updatePatient(pid, { name: p.name, phone: p.phone, birthDate: p.birthDate, address: p.address, custom: p.custom });
       closePatientInfoEditor();
       openPatientDetailsModal(pid);
     };
@@ -4048,4 +4059,96 @@
         _customMsgs = snap.exists() ? (snap.data() || {}) : {};
       }).catch(function(){});
     }, { once: true });
+
+    /* ============================================================
+       الحقول المخصّصة (مشتركة مع الطبيب) — الممرّضة تقرأ قالب الطبيب من
+       _docSettings.chartTemplate (settings/doctor)، وتعرض/تعدّل حقول
+       المريض الثابتة. أي تعديل من الطبيب يظهر هنا فور تحديث settings/doctor.
+       ============================================================ */
+    function getChartTemplate() {
+      var t = (typeof _docSettings !== 'undefined' && _docSettings && _docSettings.chartTemplate) || {};
+      return {
+        patient: Array.isArray(t.patient) ? t.patient : [],
+        visit:   Array.isArray(t.visit)   ? t.visit   : []
+      };
+    }
+    // عرض القيمة (قراءة فقط)
+    function _cfDisplayVal(f, val) {
+      if (f.type === 'checkbox') return val ? 'نعم' : '';
+      if (f.type === 'date' && val) return formatDateAr(val);
+      return (val != null && String(val).trim() !== '') ? String(val) : '';
+    }
+    function _cfChip(label, valHtml, color) {
+      return '<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;min-width:0;overflow:hidden;">'
+        + '<div style="font-size:.68rem;color:var(--text-muted);font-weight:600;margin-bottom:2px;">' + escapeHtml(label) + '</div>'
+        + '<div style="font-size:.86rem;font-weight:700;word-break:break-word;overflow-wrap:anywhere;color:' + (color || 'var(--text)') + ';">' + (valHtml || '-') + '</div></div>';
+    }
+    // بطاقات حقول المريض المخصّصة (تُعرض فقط الحقول التي لها قيمة)
+    function renderPatientCustomChips(custom) {
+      custom = custom || {};
+      return getChartTemplate().patient.map(function(f) {
+        var d = _cfDisplayVal(f, custom[f.id]);
+        return d === '' ? '' : _cfChip(f.label, escapeHtml(d));
+      }).join('');
+    }
+    // بناء عناصر الإدخال من تعريف الحقول (نمط النموذج — بطاقة معلومات المريض)
+    function buildCustomFieldInputs(container, fields, values, opts) {
+      if (!container) return;
+      opts = (typeof opts === 'string') ? { heading: opts } : (opts || {});
+      container.innerHTML = '';
+      if (!fields || !fields.length) { container.style.display = 'none'; return; }
+      container.style.display = '';
+      values = values || {};
+      if (opts.heading) {
+        var h = document.createElement('div');
+        h.style.cssText = 'font-size:.8rem;font-weight:800;color:var(--primary);margin:2px 0 10px;';
+        h.textContent = opts.heading;
+        container.appendChild(h);
+      }
+      var grid = document.createElement('div');
+      grid.style.cssText = 'display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px;align-items:start;';
+      var labelCss = 'display:block;font-size:.8rem;font-weight:700;color:var(--text-secondary);margin-bottom:5px;';
+      fields.forEach(function(f) {
+        var cell = document.createElement('div');
+        var val = values[f.id];
+        var el;
+        if (f.type === 'textarea') {
+          cell.style.gridColumn = '1/-1';
+          var lblt = document.createElement('label'); lblt.style.cssText = labelCss; lblt.textContent = f.label || '(حقل)'; cell.appendChild(lblt);
+          el = document.createElement('textarea'); el.rows = 2; el.className = 'form-input'; el.style.resize = 'vertical'; el.value = (val != null ? val : '');
+        } else if (f.type === 'checkbox') {
+          cell.style.cssText = 'display:flex;align-items:center;justify-content:space-between;gap:10px;padding-top:22px;';
+          var lblc = document.createElement('span'); lblc.style.cssText = 'font-weight:700;font-size:.82rem;color:var(--text-primary);'; lblc.textContent = f.label || '(حقل)'; cell.appendChild(lblc);
+          el = document.createElement('input'); el.type = 'checkbox';
+          el.checked = (val === true || val === 'true' || val === 'نعم');
+          el.style.cssText = 'width:20px;height:20px;accent-color:var(--primary);cursor:pointer;flex-shrink:0;';
+        } else {
+          var lbl = document.createElement('label'); lbl.style.cssText = labelCss; lbl.textContent = f.label || '(حقل)'; cell.appendChild(lbl);
+          if (f.type === 'select') {
+            el = document.createElement('select'); el.className = 'form-input';
+            var blank = document.createElement('option'); blank.value = ''; blank.textContent = '—'; el.appendChild(blank);
+            (f.options || []).forEach(function(o) { var op = document.createElement('option'); op.value = o; op.textContent = o; if (String(val) === String(o)) op.selected = true; el.appendChild(op); });
+          } else {
+            el = document.createElement('input'); el.type = (f.type === 'number') ? 'number' : (f.type === 'date' ? 'date' : 'text');
+            el.className = 'form-input'; el.value = (val != null ? val : '');
+          }
+        }
+        el.setAttribute('data-cfid', f.id);
+        el.setAttribute('data-cftype', f.type);
+        cell.appendChild(el);
+        grid.appendChild(cell);
+      });
+      container.appendChild(grid);
+    }
+    function readCustomFieldInputs(container) {
+      var out = {};
+      if (!container) return out;
+      Array.prototype.forEach.call(container.querySelectorAll('[data-cfid]'), function(el) {
+        var id = el.getAttribute('data-cfid'), type = el.getAttribute('data-cftype');
+        if (type === 'checkbox') { if (el.checked) out[id] = true; return; }
+        var v = el.value;
+        if (v != null && String(v).trim() !== '') out[id] = (type === 'number') ? Number(v) : v;
+      });
+      return out;
+    }
   

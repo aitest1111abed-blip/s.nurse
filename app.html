@@ -905,6 +905,8 @@
         <div><label class="form-label">رقم الهاتف</label><input type="tel" id="piPhone" class="form-input" dir="ltr"></div>
         <div><label class="form-label">تاريخ الميلاد <span id="piAgeDisplay" style="color:var(--primary);font-weight:800;"></span></label><input type="date" id="piBirth" class="form-input" style="direction:ltr;" oninput="updatePiAge()"></div>
         <div><label class="form-label">العنوان</label><input type="text" id="piAddress" class="form-input" placeholder="المدينة / الحي"></div>
+        <!-- حقول المريض المخصّصة (قالب الطبيب المشترك) — تُبنى ديناميكياً -->
+        <div id="piCustomFields" style="display:none;"></div>
       </div>
       <div style="padding:14px 20px;border-top:1.5px solid var(--border);display:flex;gap:10px;">
         <button onclick="closePatientInfoEditor()" class="btn-secondary" style="flex:1;justify-content:center;">إلغاء</button>
@@ -1831,7 +1833,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="script.js"></script>
+  <script src="script.js?v=44"></script>
   <script>
     function copyPhone(btn) {
       navigator.clipboard.writeText('+491773052955').then(function() {
