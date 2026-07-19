@@ -2129,10 +2129,8 @@
         Object.assign({}, apptRecord, { createdAt: window._fb.serverTimestamp() })
       ).catch(function(e) { console.error('[addVisit→appointments]', e); });
 
-      // ── إشارة للطبيب: افتح إضبارة هذا المريض تلقائياً (وثيقة واحدة يستمع لها الطبيب) ──
-      window._fb.setDoc(window._fb.docRef('config', 'nowServing'),
-        { patientId: p.id, name: p.name || p.PatientName || '', ts: Date.now() }, { merge: true }
-      ).catch(function(){});
+      // ── إشارة للطبيب: حضر المريض ──
+      _signalNowServing(p.id, p.name || p.PatientName || '');
 
       document.getElementById('addVisitModal').classList.add('hidden');
       showToast('تمت إضافة الزيارة — فُتحت إضبارته عند الطبيب','success');
@@ -2235,6 +2233,14 @@
       selectPatientForVisit(selectedVisitPatientId);
     });
 
+    // إشارة للطبيب: حضر المريض (تُكتب وثيقة واحدة يستمع لها الطبيب)
+    function _signalNowServing(patientId, name) {
+      window._fb.setDoc(window._fb.docRef('config', 'nowServing'),
+        { patientId: patientId, name: name || '', ts: Date.now() }, { merge: true }
+      ).then(function(){ console.log('[nowServing] أُرسلت الإشارة للطبيب:', patientId, name); })
+       .catch(function(e){ console.error('[nowServing] فشل الإرسال:', e); showToast('تعذّر إرسال الإشارة للطبيب — تحقّق من قواعد Firestore', 'error'); });
+    }
+
     function submitNewPatientVisit() {
       const name = document.getElementById('visitNewPatientName').value.trim();
       const phone = document.getElementById('visitNewPatientPhone').value.trim();
@@ -2260,6 +2266,7 @@
           { Status: 'Visited', linkedPatientId: patientId }, { merge: true }
         ).catch(function(e) { console.error(e); });
       }
+      _signalNowServing(patientId, name);   // إشعار الطبيب: حضر المريض
       document.getElementById('visitManagementModal').classList.add('hidden');
       showToast('تمت الزيارة وتم نقل المريض إلى الدفتر','success');
       updateCounts(); calculateDensity(); renderCalendar();
@@ -2288,6 +2295,7 @@
           { Status: 'Visited', linkedPatientId: patientId }, { merge: true }
         ).catch(function(e) { console.error(e); });
       }
+      _signalNowServing(patientId, p.name);   // إشعار الطبيب: حضر المريض
       document.getElementById('visitManagementModal').classList.add('hidden');
       showToast('تمت الزيارة وتمت إضافتها لسجل المريض','success');
       updateCounts(); calculateDensity(); renderCalendar();
