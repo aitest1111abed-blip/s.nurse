@@ -847,21 +847,17 @@
   <!-- Patient Details Modal -->
   <div id="patientDetailsModal" class="hidden fixed inset-0 z-[150] modal-overlay">
     <div class="modal-content" style="max-width:none; width:100%; height:100%; max-height:100%; display:flex; flex-direction:column; overflow:hidden; border-radius:0;">
-      <!-- Header -->
-      <div style="padding:14px 18px;border-bottom:1.5px solid var(--border);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;background:var(--surface);">
-        <div style="display:flex;align-items:center;gap:12px;min-width:0;">
-          <div id="chartAvatar" style="width:46px;height:46px;border-radius:50%;background:var(--primary-light);color:var(--primary);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.1rem;flex-shrink:0;">؟</div>
-          <div style="min-width:0;">
-            <h3 id="modalPatientName" style="font-weight:800;font-size:1.05rem;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">-</h3>
-            <p id="modalPatientPhone" dir="ltr" style="color:var(--primary);font-size:.85rem;text-align:right;margin-top:1px;"></p>
+      <!-- Hero: بروفايل المريض -->
+      <div class="pf-hero">
+        <div class="pf-head">
+          <div id="chartAvatar" class="pf-avatar">؟</div>
+          <div class="pf-id">
+            <h3 id="modalPatientName" class="pf-name">-</h3>
+            <p id="modalPatientPhone" class="pf-phone" dir="ltr"></p>
           </div>
+          <button id="closePatientDetailsModalBtn" onclick="closePatientDetailsModal()" class="pf-close" title="إغلاق"><i class="fas fa-times"></i></button>
         </div>
-        <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-          <a id="modalWhatsappBtn" href="#" target="_blank" class="action-btn-small whatsapp-btn"><i class="fab fa-whatsapp"></i></a>
-          <a id="modalCallBtn" href="#" class="action-btn-small call-btn"><i class="fas fa-phone"></i></a>
-          <button onclick="printPatientChart(document.getElementById('patientDetailsModal').dataset.patientId)" title="طباعة الإضبارة (PDF)" style="width:36px;height:36px;border-radius:9px;border:1.5px solid var(--border-strong);background:var(--primary-light);color:var(--primary);cursor:pointer;display:flex;align-items:center;justify-content:center;"><i class="fas fa-print"></i></button>
-          <button id="closePatientDetailsModalBtn" onclick="closePatientDetailsModal()" title="إغلاق" style="width:36px;height:36px;border-radius:9px;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;"><i class="fas fa-times"></i></button>
-        </div>
+        <div id="chartHeaderPills" class="pf-pills"></div>
       </div>
       <!-- Body -->
       <div style="flex:1; overflow-y:auto; padding:20px; background:var(--bg);">
@@ -869,20 +865,27 @@
 
           <!-- معلومات المريض -->
           <div class="glass-card chart-info-card" style="padding:16px;">
-            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;gap:8px;">
               <h4 style="font-weight:800;font-size:.9rem;color:var(--primary);margin:0;"><i class="fas fa-id-card" style="margin-left:6px;"></i>معلومات المريض</h4>
               <button onclick="openPatientInfoEditor(document.getElementById('patientDetailsModal').dataset.patientId)" style="display:inline-flex;align-items:center;gap:5px;font-size:.76rem;font-weight:700;color:var(--primary);background:var(--primary-light);border:1.5px solid var(--border-strong);border-radius:8px;padding:5px 12px;cursor:pointer;font-family:inherit;"><i class="fas fa-pen" style="font-size:.68rem;"></i> تعديل</button>
             </div>
-            <div id="chartInfoGrid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;"></div>
+            <div id="chartInfoGrid" class="pf-tiles"></div>
           </div>
 
           <!-- أرشيف الزيارات -->
           <div class="glass-card" style="padding:16px;">
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
               <h4 style="font-weight:800;font-size:.9rem;color:var(--primary);margin:0;"><i class="fas fa-folder-open" style="margin-left:6px;"></i>أرشيف الزيارات <span id="chartVisitsCount" style="font-size:.72rem;color:var(--text-muted);font-weight:600;"></span></h4>
-              <button onclick="openAddVisitModalFromModal()" class="btn-primary" style="padding:7px 14px;font-size:.8rem;"><i class="fas fa-plus"></i> زيارة جديدة</button>
+              <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
+                <div class="pf-head-actions">
+                  <a id="modalWhatsappBtn" href="#" target="_blank" class="pf-actbtn wa" title="واتساب"><i class="fab fa-whatsapp"></i></a>
+                  <a id="modalCallBtn" href="#" class="pf-actbtn" title="اتصال"><i class="fas fa-phone"></i></a>
+                  <button onclick="printPatientChart(document.getElementById('patientDetailsModal').dataset.patientId)" class="pf-actbtn" title="طباعة الإضبارة (PDF)"><i class="fas fa-print"></i></button>
+                </div>
+                <button onclick="openAddVisitModalFromModal()" class="btn-primary" style="padding:7px 14px;font-size:.8rem;"><i class="fas fa-plus"></i> زيارة جديدة</button>
+              </div>
             </div>
-            <div id="chartVisitsList" style="display:flex;flex-direction:column;gap:10px;"></div>
+            <div id="chartVisitsList" class="pf-tl" style="display:flex;flex-direction:column;gap:10px;"></div>
             <div id="modalVisitsTableBody" style="display:none;"></div>
             <span id="modalPatientBirthDate" style="display:none;"></span><span id="modalPatientAge" style="display:none;"></span><span id="modalPatientAddress" style="display:none;"></span><span id="modalPatientTotalVisits" style="display:none;"></span>
           </div>
@@ -1833,7 +1836,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="script.js?v=44"></script>
+  <script src="script.js?v=47"></script>
   <script>
     function copyPhone(btn) {
       navigator.clipboard.writeText('+491773052955').then(function() {

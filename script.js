@@ -1890,23 +1890,8 @@
       document.getElementById('modalWhatsappBtn').href = `https://wa.me/${normalizePhone(p.phone||'')}`;
       document.getElementById('modalCallBtn').href     = `tel:${normalizePhone(p.phone||'')}`;
       document.getElementById('chartAvatar').textContent = ((p.name||'؟').trim().charAt(0)) || '؟';
-      const age = p.birthDate ? calculateAge(p.birthDate) : null;
-      function chip(label, val, color) {
-        return '<div style="background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;min-width:0;overflow:hidden;">'
-          + '<div style="font-size:.68rem;color:var(--text-muted);font-weight:600;margin-bottom:2px;">' + label + '</div>'
-          + '<div style="font-size:.86rem;font-weight:700;word-break:break-word;overflow-wrap:anywhere;color:' + (color || 'var(--text)') + ';">' + (val || '-') + '</div></div>';
-      }
-      document.getElementById('chartInfoGrid').innerHTML =
-        chip('رقم الهاتف', '<span dir="ltr">' + escapeHtml(p.phone || '-') + '</span>')
-        + chip('تاريخ الميلاد', p.birthDate ? formatDateAr(p.birthDate) : '-')
-        + chip('العمر', age != null ? age + ' سنة' : '-')
-        + chip('زمرة الدم', p.bloodType ? escapeHtml(p.bloodType) : '-', p.bloodType ? '#dc2626' : 'var(--text-muted)')
-        + chip('العنوان', escapeHtml(p.address || '-'))
-        + chip('إجمالي الزيارات', String(p.totalVisits || (p.appointments ? p.appointments.length : 0)))
-        + renderPatientCustomChips(p.custom)   // حقول المريض المخصّصة (قالب الطبيب المشترك)
-        + '<div style="grid-column:1/-1;background:var(--bg);border:1.5px solid var(--border);border-radius:10px;padding:8px 11px;min-width:0;">'
-          + '<div style="font-size:.68rem;color:var(--text-muted);font-weight:600;margin-bottom:2px;">أمراض مزمنة</div>'
-          + '<div style="font-size:.86rem;font-weight:700;word-break:break-word;overflow-wrap:anywhere;line-height:1.7;max-height:160px;overflow-y:auto;color:' + (p.chronicDiseases ? '#d97706' : 'var(--text-muted)') + ';">' + escapeHtml(p.chronicDiseases || 'لا يوجد') + '</div></div>';
+      var _pills = document.getElementById('chartHeaderPills'); if (_pills) _pills.innerHTML = renderChartHeaderPills(p);
+      document.getElementById('chartInfoGrid').innerHTML = renderChartInfoTiles(p);
       renderChartVisits(patientId);
       document.getElementById('patientDetailsModal').dataset.patientId = patientId;
       document.getElementById('patientDetailsModal').classList.remove('hidden');
@@ -2037,6 +2022,11 @@
       const p = allPatients[pid]; if (!p) return;
       const age = p.birthDate ? calculateAge(p.birthDate) : null;
       function cell(k, val, full) { return '<div class="info-cell' + (full ? ' full' : '') + '"><div class="k">' + k + '</div><div class="vv">' + (val || '-') + '</div></div>'; }
+      // خلايا حقول المريض المخصّصة (قالب الطبيب المشترك) — تُطبع الحقول التي لها قيمة
+      var pcustom = getChartTemplate().patient.map(function(f) {
+        var d = _cfDisplayVal(f, (p.custom || {})[f.id]);
+        return d === '' ? '' : cell(escapeHtml(f.label), escapeHtml(d));
+      }).join('');
       const info = '<div class="sec-title">معلومات المريض</div><div class="info-grid">'
         + cell('الاسم', escapeHtml(p.name || '-'))
         + cell('الهاتف', escapeHtml(p.phone || '-'))
@@ -2044,12 +2034,22 @@
         + cell('العمر', age != null ? age + ' سنة' : '-')
         + cell('زمرة الدم', escapeHtml(p.bloodType || '-'))
         + cell('العنوان', escapeHtml(p.address || '-'))
+        + pcustom
         + cell('أمراض مزمنة', escapeHtml(p.chronicDiseases || 'لا يوجد'), true)
         + '</div>';
+      // عمود إضافي لحقول الزيارة المخصّصة (يظهر فقط عند وجود حقول زيارة مُعرّفة)
+      var vFields = getChartTemplate().visit;
+      function _vCustomText(v) {
+        var cst = (v && v.custom) || {};
+        return vFields.map(function(f) {
+          var d = _cfDisplayVal(f, cst[f.id]);
+          return d === '' ? '' : (escapeHtml(f.label) + ': ' + escapeHtml(d));
+        }).filter(Boolean).join(' · ');
+      }
       const visits = (p.appointments || []).slice().sort(function(a, b){ return (a.date || '').localeCompare(b.date || ''); });
-      let rows = visits.map(function(v, i){ return '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(v.visitType || '-') + '</td><td>' + formatDateAr(v.date) + '</td><td>' + slotTimeOf(v) + '</td></tr>'; }).join('');
-      if (!rows) rows = '<tr><td colspan="4" style="text-align:center;color:#64748b;">لا توجد زيارات</td></tr>';
-      const archive = '<div class="sec-title">أرشيف الزيارات</div><table class="atbl"><thead><tr><th style="width:42px;">#</th><th>نوع الزيارة</th><th>التاريخ</th><th>الوقت</th></tr></thead><tbody>' + rows + '</tbody></table>';
+      let rows = visits.map(function(v, i){ return '<tr><td>' + (i + 1) + '</td><td>' + escapeHtml(v.visitType || '-') + '</td><td>' + formatDateAr(v.date) + '</td><td>' + slotTimeOf(v) + '</td>' + (vFields.length ? ('<td>' + (_vCustomText(v) || '-') + '</td>') : '') + '</tr>'; }).join('');
+      if (!rows) rows = '<tr><td colspan="' + (vFields.length ? 5 : 4) + '" style="text-align:center;color:#64748b;">لا توجد زيارات</td></tr>';
+      const archive = '<div class="sec-title">أرشيف الزيارات</div><table class="atbl"><thead><tr><th style="width:42px;">#</th><th>نوع الزيارة</th><th>التاريخ</th><th>الوقت</th>' + (vFields.length ? '<th>القياسات / البيانات</th>' : '') + '</tr></thead><tbody>' + rows + '</tbody></table>';
       _printSheet('إضبارة المريض', info + archive);
     };
 
@@ -4090,6 +4090,60 @@
         var d = _cfDisplayVal(f, custom[f.id]);
         return d === '' ? '' : _cfChip(f.label, escapeHtml(d));
       }).join('');
+    }
+    // ===== 🩺 عناصر تصميم البروفايل (اضبارة المريض) =====
+    function _cfIsAllergy(f) { return /حساس|تحسس|allerg/i.test(f.label || ''); }
+    function _cfTypeIcon(type) {
+      return type === 'number' ? 'fa-hashtag' : type === 'date' ? 'fa-calendar-day'
+        : type === 'select' ? 'fa-list-ul' : type === 'checkbox' ? 'fa-circle-check' : 'fa-notes-medical';
+    }
+    function _pfPill(k, v, dotColor) {
+      return '<span class="pf-pill">' + (dotColor ? '<span class="dot" style="background:' + dotColor + '"></span>' : '')
+        + '<span class="k">' + escapeHtml(k) + '</span><span class="val num">' + v + '</span></span>';
+    }
+    function _pfTile(label, valHtml, opts) {
+      opts = opts || {};
+      var icon = opts.icon ? '<i class="fas ' + opts.icon + '"' + (opts.iconColor ? ' style="color:' + opts.iconColor + '"' : '') + '></i>' : '';
+      var vc = opts.valColor ? ' style="color:' + opts.valColor + '"' : '';
+      return '<div class="pf-tile' + (opts.full ? ' full' : '') + '"><span class="lab">' + icon + escapeHtml(label) + '</span>'
+        + '<span class="val"' + vc + '>' + (valHtml || '-') + '</span></div>';
+    }
+    function _pfAllergy(custom) {
+      custom = custom || {};
+      return getChartTemplate().patient.filter(_cfIsAllergy).map(function(f) {
+        var d = _cfDisplayVal(f, custom[f.id]);
+        return d === '' ? '' : '<div class="pf-alert"><div class="ic"><i class="fas fa-triangle-exclamation"></i></div>'
+          + '<div><div class="t">' + escapeHtml(f.label) + '</div><div class="d">' + escapeHtml(d) + '</div></div></div>';
+      }).join('');
+    }
+    function renderPatientCustomTiles(custom) {
+      custom = custom || {};
+      return getChartTemplate().patient.filter(function(f) { return !_cfIsAllergy(f); }).map(function(f) {
+        var d = _cfDisplayVal(f, custom[f.id]);
+        return d === '' ? '' : _pfTile(f.label, escapeHtml(d), { icon: _cfTypeIcon(f.type) });
+      }).join('');
+    }
+    function renderChartHeaderPills(p) {
+      var age = p.birthDate ? calculateAge(p.birthDate) : null;
+      var visits = String(p.totalVisits || (p.appointments ? p.appointments.length : 0));
+      return _pfPill('العمر', age != null ? age + ' سنة' : '-')
+        + (p.bloodType ? _pfPill('الزمرة', escapeHtml(p.bloodType), '#dc2626') : '')
+        + _pfPill('الزيارات', visits)
+        + (p.birthDate ? _pfPill('الميلاد', formatDateAr(p.birthDate)) : '')
+        + (p.address ? _pfPill('العنوان', escapeHtml(p.address)) : '');
+    }
+    function renderChartInfoTiles(p) {
+      var age = p.birthDate ? calculateAge(p.birthDate) : null;
+      var visits = String(p.totalVisits || (p.appointments ? p.appointments.length : 0));
+      return _pfAllergy(p.custom)
+        + _pfTile('رقم الهاتف', '<span dir="ltr">' + escapeHtml(p.phone || '-') + '</span>', { icon: 'fa-phone' })
+        + _pfTile('تاريخ الميلاد', p.birthDate ? formatDateAr(p.birthDate) : '-', { icon: 'fa-calendar-day' })
+        + _pfTile('العمر', age != null ? age + ' سنة' : '-', { icon: 'fa-hourglass-half' })
+        + _pfTile('زمرة الدم', p.bloodType ? escapeHtml(p.bloodType) : '-', { icon: 'fa-droplet', iconColor: '#dc2626', valColor: p.bloodType ? '#dc2626' : 'var(--text-muted)' })
+        + _pfTile('العنوان', escapeHtml(p.address || '-'), { icon: 'fa-location-dot' })
+        + _pfTile('إجمالي الزيارات', visits, { icon: 'fa-clock-rotate-left' })
+        + renderPatientCustomTiles(p.custom)
+        + _pfTile('أمراض مزمنة', escapeHtml(p.chronicDiseases || 'لا يوجد'), { full: true, icon: 'fa-heart-pulse', iconColor: '#d97706', valColor: p.chronicDiseases ? '#d97706' : 'var(--text-muted)' });
     }
     // بناء عناصر الإدخال من تعريف الحقول (نمط النموذج — بطاقة معلومات المريض)
     function buildCustomFieldInputs(container, fields, values, opts) {

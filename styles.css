@@ -2464,3 +2464,55 @@
           .cal-legend-row{display:flex;align-items:center;justify-content:space-between;font-size:.74rem;color:var(--text-muted);}
           .cal-legend-dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-left:6px;}
         
+/* ===== 🩺 تصميم البروفايل — اضبارة المريض (ملء الشاشة، يتبع الوضعين) ===== */
+.pf-hero{background:var(--surface);flex-shrink:0;border-bottom:1.5px solid var(--border);}
+.pf-cover{height:96px;position:relative;overflow:hidden;background:
+  radial-gradient(120% 140% at 85% -20%,#14b8a6 0%,transparent 55%),
+  radial-gradient(120% 160% at 10% 0%,#0f766e 0%,transparent 60%),
+  linear-gradient(135deg,#0d9488,#0f766e);}
+.pf-cover::after{content:"";position:absolute;inset:0;opacity:.14;background-image:radial-gradient(rgba(255,255,255,.9) 1px,transparent 1.4px);background-size:22px 22px;}
+.pf-cover-actions{position:absolute;top:12px;left:14px;display:flex;gap:8px;z-index:2;}
+.pf-cbtn{width:38px;height:38px;border-radius:11px;border:1px solid rgba(255,255,255,.28);cursor:pointer;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.18);color:#fff;font-size:.95rem;transition:background .15s,transform .1s;text-decoration:none;}
+.pf-cbtn:hover{background:rgba(255,255,255,.32);}
+.pf-cbtn:active{transform:scale(.94);}
+.pf-cbtn.wa{background:#16a34a;border-color:transparent;}
+.pf-cbtn.wa:hover{filter:brightness(1.08);}
+.pf-head{display:flex;gap:14px;align-items:center;padding:16px 20px;flex-wrap:wrap;}
+.pf-avatar{width:62px;height:62px;border-radius:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;color:#fff;background:linear-gradient(140deg,#0d9488,#115e59);box-shadow:0 10px 24px -12px rgba(13,148,136,.65);}
+.pf-close{width:38px;height:38px;border-radius:11px;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;margin-inline-start:auto;flex-shrink:0;transition:background .15s,color .15s;}
+.pf-close:hover{background:#fef2f2;color:#dc2626;}
+.pf-id{flex:1;min-width:0;padding-bottom:2px;}
+.pf-name{font-weight:800;font-size:1.35rem;color:var(--text);letter-spacing:-.2px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;line-height:1.25;}
+.pf-verline{font-size:.6rem;font-weight:800;color:var(--primary);background:var(--primary-light);border:1px solid var(--border-strong);border-radius:999px;padding:3px 10px;letter-spacing:.3px;white-space:nowrap;}
+.pf-phone{direction:ltr;text-align:right;color:var(--primary);font-weight:700;font-size:.9rem;margin-top:3px;}
+.pf-edit{align-self:flex-end;margin-bottom:4px;display:inline-flex;align-items:center;gap:6px;font-size:.78rem;font-weight:700;color:var(--primary);background:var(--primary-light);border:1.5px solid var(--border-strong);border-radius:11px;padding:8px 14px;cursor:pointer;font-family:inherit;}
+.pf-edit:hover{border-color:var(--primary);}
+.pf-pills{display:flex;gap:9px;flex-wrap:wrap;padding:0 22px 16px;}
+.pf-pill{display:inline-flex;align-items:center;gap:7px;background:var(--bg);border:1px solid var(--border);border-radius:12px;padding:7px 12px;font-size:.82rem;font-weight:800;color:var(--text);}
+.pf-pill .k{color:var(--text-muted);font-weight:600;font-size:.72rem;}
+.pf-pill .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
+
+/* بطاقات المعلومات */
+.pf-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;}
+.pf-tile{background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;}
+.pf-tile .lab{font-size:.7rem;color:var(--text-muted);font-weight:700;display:flex;align-items:center;gap:6px;}
+.pf-tile .lab i{font-size:.72rem;opacity:.85;width:13px;text-align:center;}
+.pf-tile .val{font-size:.95rem;font-weight:800;color:var(--text);word-break:break-word;overflow-wrap:anywhere;}
+.pf-tile.full{grid-column:1/-1;}
+.pf-alert{grid-column:1/-1;display:flex;gap:11px;align-items:flex-start;background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.4);border-radius:12px;padding:11px 13px;}
+.pf-alert .ic{width:32px;height:32px;border-radius:9px;background:rgba(245,158,11,.2);color:#f59e0b;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
+.pf-alert .t{font-size:.76rem;font-weight:800;color:#f59e0b;}
+.pf-alert .d{font-size:.86rem;font-weight:700;color:var(--text);margin-top:1px;word-break:break-word;overflow-wrap:anywhere;}
+
+/* الخطّ الزمني للزيارات */
+.pf-tl{position:relative;padding-inline-start:20px;}
+.pf-tl::before{content:"";position:absolute;inset-inline-start:5px;top:8px;bottom:8px;width:2px;background:var(--border-strong);}
+.pf-tl .chart-visit{position:relative;overflow:visible;}
+.pf-tl .chart-visit::before{content:"";position:absolute;inset-inline-start:-20px;top:16px;width:11px;height:11px;border-radius:50%;background:var(--surface);border:3px solid var(--primary);z-index:1;}
+
+/* أزرار إجراءات الهيرو (طباعة/اتصال/واتساب) — مجموعة مرتّبة */
+.pf-head-actions{display:flex;gap:8px;flex-shrink:0;flex-wrap:wrap;}
+.pf-actbtn{width:40px;height:40px;border-radius:12px;border:1.5px solid var(--border-strong);background:var(--primary-light);color:var(--primary);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;text-decoration:none;transition:filter .15s,transform .1s;}
+.pf-actbtn:hover{filter:brightness(.97);}
+.pf-actbtn:active{transform:scale(.94);}
+.pf-actbtn.wa{background:#16a34a;color:#fff;border-color:transparent;}
