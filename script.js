@@ -2129,8 +2129,13 @@
         Object.assign({}, apptRecord, { createdAt: window._fb.serverTimestamp() })
       ).catch(function(e) { console.error('[addVisit→appointments]', e); });
 
+      // ── إشارة للطبيب: افتح إضبارة هذا المريض تلقائياً (وثيقة واحدة يستمع لها الطبيب) ──
+      window._fb.setDoc(window._fb.docRef('config', 'nowServing'),
+        { patientId: p.id, name: p.name || p.PatientName || '', ts: Date.now() }, { merge: true }
+      ).catch(function(){});
+
       document.getElementById('addVisitModal').classList.add('hidden');
-      showToast('تمت إضافة الزيارة','success');
+      showToast('تمت إضافة الزيارة — فُتحت إضبارته عند الطبيب','success');
     }
 
     function showVisitStep(step) {
