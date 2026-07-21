@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DocBook — دخول الطبيب</title>
+  <title>DocBook — دخول الممرضة</title>
 
   <!-- نفس خطوط دوكبوك -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -54,17 +54,14 @@
       flex: 1 1 50%;
       position: relative;
       overflow: hidden;
-      /* تدرّج احتياطي يظهر إن لم يوجد فيديو/صورة */
       background: linear-gradient(135deg, #0d9488 0%, #14b8a6 55%, #2dd4bf 100%);
     }
-    /* الفيديو/الصورة يملأ القسم بالكامل */
     .auth-media-bg {
       position: absolute; inset: 0;
       width: 100%; height: 100%;
       object-fit: cover;
       display: block;
     }
-    /* طبقة تظليل خفيفة فوق الوسائط لإبراز الشعار والنقاط */
     .auth-media-overlay {
       position: absolute; inset: 0;
       background: linear-gradient(180deg, rgba(13,148,136,.22) 0%, rgba(15,118,110,.42) 100%);
@@ -88,7 +85,6 @@
     }
     .auth-card { width: 100%; max-width: 420px; }
 
-    /* الشعار + DocBook فوق زر الدخول */
     .brand { display: flex; flex-direction: column; align-items: center; gap: 12px; margin-bottom: 30px; }
     .brand-logo {
       width: 76px; height: 76px; border-radius: 20px; overflow: hidden;
@@ -265,9 +261,8 @@
 <body>
   <div class="auth-wrap">
 
-    <!-- ===== لوحة الوسائط (يمين) — ضع فيديو media.mp4 أو صورة media.jpg داخل مجلد doctor ===== -->
+    <!-- ===== لوحة الوسائط (يمين) — ضع فيديو media.mp4 أو صورة media.jpg داخل مجلد nurse ===== -->
     <aside class="auth-media">
-      <!-- فيديو الخلفية (اختياري): ضع ملفاً باسم media.mp4 — أو احذف هذا الوسم واترك التدرّج -->
       <video class="auth-media-bg" autoplay muted loop playsinline preload="auto" poster="media.jpg">
         <source src="media.mp4" type="video/mp4" />
       </video>
@@ -288,7 +283,7 @@
           </svg>
         </div>
 
-        <p class="auth-sub">سجّل الدخول للمتابعة إلى لوحة الطبيب.</p>
+        <p class="auth-sub">سجّل الدخول للمتابعة إلى لوحة الممرضة.</p>
 
         <div class="auth-msg" id="authMsg"></div>
 
@@ -375,7 +370,7 @@
              browserLocalPersistence, setPersistence, signOut }
       from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
 
-    const EXPECTED_ROLE = 'doctor';   // ← هذه صفحة دخول الطبيب
+    const EXPECTED_ROLE = 'nurse';   // ← هذه صفحة دخول الممرضة
     const APP_PAGE      = 'app.html';
 
     const firebaseConfig = window.FIREBASE_CONFIG;   // ← يأتي من config.js (الملف الوحيد للتعديل)
@@ -394,7 +389,7 @@
     function rejectMsg(user) {
       var email = (user && user.email) ? user.email : '—';
       if (!window.DOCBOOK_ROLES) return 'تعذّر تحميل config.js — تأكّد من وجوده بجانب هذه الصفحة.';
-      return 'الحساب (' + email + ') غير مصرّح لهذه اللوحة. المسموح: ' + (window.DOCBOOK_ROLES.doctor || []).join('، ');
+      return 'الحساب (' + email + ') غير مصرّح لهذه اللوحة. المسموح: ' + (window.DOCBOOK_ROLES.nurse || []).join('، ');
     }
 
     function handleUser(user) {

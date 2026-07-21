@@ -1,8 +1,8 @@
 {
-  "id": "docbook-doctor-v1",
-  "name": "DocBook — لوحة الطبيب",
-  "short_name": "DocBook طبيب",
-  "description": "نظام إدارة العيادة — لوحة الطبيب",
+  "id": "docbook-nurse-v1",
+  "name": "DocBook — لوحة الممرضة",
+  "short_name": "DocBook ممرضة",
+  "description": "نظام إدارة العيادة — لوحة الممرضة",
   "start_url": "./",
   "scope": "./",
   "display": "standalone",

@@ -16,6 +16,7 @@ window.FIREBASE_CONFIG = {
   appId: "1:943515326256:web:b1eff0fd8ea996eb73daf5"
 };
 
+
 /* (2) حسابات جوجل للموظفين — نفس هذه الإيميلات يجب أن تُوضع في قواعد Firestore */
 window.DOCBOOK_ROLES = {
   doctor: ['aistam379@gmail.com'],   // ← بريد/بُرُد الطبيب (يمكن أكثر من واحد)
