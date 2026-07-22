@@ -974,7 +974,26 @@
         .catch(function(e) { showToast('فشل الحفظ','error'); console.error(e); });
     }
 
+    /* ── حارس حجم مستند المريض ──
+       كل زيارات المريض في مستند واحد، وحدّ Firestore ١ ميغابايت. عند بلوغه يفشل
+       الحفظ كلياً بلا رسالة مفهومة. نحذّر قبل ذلك بوقت كافٍ.
+       TextEncoder لا String.length: النصّ العربي حرفان بايت في UTF-8 فيُقاس نصفه خطأً.
+       هنا تحذير فقط بلا منع — مسار الممرّضة ينشئ سجلّ موعد مرافقاً، ومنع الحفظ
+       وسطه يترك البيانات متناقضة. المنع (عند ٩٥٪) في تطبيق الطبيب حيث الحفظ مستقلّ. */
+    var DOC_LIMIT = 1048576;
+    var _sizeWarned = {};
+    function _docSizeBytes(o) {
+      try { return new TextEncoder().encode(JSON.stringify(o)).length; } catch (e) { return 0; }
+    }
+    function _warnDocSize(patientId, data) {
+      var pct = Math.round(_docSizeBytes(data) / DOC_LIMIT * 100);
+      if (pct < 75 || _sizeWarned[patientId]) return;
+      _sizeWarned[patientId] = 1;   // مرّة واحدة لكل مريض في الجلسة
+      showToast('تنبيه: ملف هذا المريض امتلأ ' + pct + '٪ — أبلغ الطبيب', 'error');
+    }
+
     function updatePatient(patientId, updatedData) {
+      _warnDocSize(patientId, updatedData);
       window._fb.setDoc(window._fb.docRef('patients', patientId), updatedData, { merge: true })
         .then(function() { showToast('تم التحديث','success'); })
         .catch(function(e) { console.error(e); });
@@ -2313,7 +2332,9 @@
       document.getElementById('currentMonth').textContent = `${monthsAr[month]} ${year}`;
       const firstDay = new Date(year,month,1).getDay();
       const daysInMonth = new Date(year,month+1,0).getDate();
-      let startOffset = firstDay; // الأسبوع يبدأ الأحد (Su)
+      // الأسبوع يبدأ الجمعة — مطابق لروزنامة الطبيب. لا بدّ أن توافق هذه المعادلة
+      // ترتيب الأسماء في app.html، وإلا وقع كل يوم في عمود غير عموده.
+      let startOffset = (firstDay + 2) % 7;
       for(let i=startOffset-1;i>=0;i--) {
         const d=document.createElement('div'); d.className='compact-calendar-day other-month'; d.textContent=''; grid.appendChild(d);
       }

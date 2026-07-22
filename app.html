@@ -447,22 +447,24 @@
                 <button id="prevMonthBtn" class="compact-nav-btn"><i class="fas fa-chevron-right"></i></button>
                 <div style="text-align:center;">
                   <h3 id="currentMonth" style="font-weight:700; font-size:.95rem;">-</h3>
+                  <!-- نفس أصناف نقاط الروزنامة لا ألوان مكتوبة يدوياً — فلا يكذب المفتاح إن تغيّر الثيم -->
                   <div class="density-legend">
-                    <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:#2563eb;"></div><span>خفيف</span></div>
-                    <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:var(--amber);"></div><span>متوسط</span></div>
-                    <div style="display:flex;align-items:center;gap:4px;"><div style="width:8px;height:8px;border-radius:50%;background:var(--red);"></div><span>مزدحم</span></div>
+                    <div style="display:flex;align-items:center;gap:4px;"><div class="compact-dot-low" style="width:8px;height:8px;border-radius:50%;"></div><span>خفيف</span></div>
+                    <div style="display:flex;align-items:center;gap:4px;"><div class="compact-dot-medium" style="width:8px;height:8px;border-radius:50%;"></div><span>متوسط</span></div>
+                    <div style="display:flex;align-items:center;gap:4px;"><div class="compact-dot-high" style="width:8px;height:8px;border-radius:50%;"></div><span>مزدحم</span></div>
                   </div>
                 </div>
                 <button id="nextMonthBtn" class="compact-nav-btn"><i class="fas fa-chevron-left"></i></button>
               </div>
               <div class="compact-calendar-grid" style="margin-bottom:8px;">
-                <div class="compact-calendar-day-name">Su</div>
-                <div class="compact-calendar-day-name">Mo</div>
-                <div class="compact-calendar-day-name">Tu</div>
-                <div class="compact-calendar-day-name">We</div>
-                <div class="compact-calendar-day-name">Th</div>
-                <div class="compact-calendar-day-name">Fr</div>
-                <div class="compact-calendar-day-name">Sa</div>
+                <!-- أسماء عربية وبداية الجمعة — مطابقة لروزنامة الطبيب (كانت Su/Mo وتبدأ الأحد) -->
+                <div class="compact-calendar-day-name">الجمعة</div>
+                <div class="compact-calendar-day-name">السبت</div>
+                <div class="compact-calendar-day-name">الأحد</div>
+                <div class="compact-calendar-day-name">الإثنين</div>
+                <div class="compact-calendar-day-name">الثلاثاء</div>
+                <div class="compact-calendar-day-name">الأربعاء</div>
+                <div class="compact-calendar-day-name">الخميس</div>
               </div>
               <div id="calendarGrid" class="compact-calendar-grid"></div>
             </div>
@@ -1836,7 +1838,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="script.js?v=50"></script>
+  <script src="script.js?v=52"></script>
   <script>
     function copyPhone(btn) {
       navigator.clipboard.writeText('+491773052955').then(function() {
