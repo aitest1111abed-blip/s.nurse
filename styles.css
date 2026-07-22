@@ -2483,7 +2483,7 @@
 .pf-cbtn.wa:hover{filter:brightness(1.08);}
 .pf-head{display:flex;gap:14px;align-items:center;padding:16px 20px;flex-wrap:wrap;}
 .pf-avatar{width:62px;height:62px;border-radius:18px;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.6rem;font-weight:800;color:#fff;background:linear-gradient(140deg,#0d9488,#115e59);box-shadow:0 10px 24px -12px rgba(13,148,136,.65);}
-.pf-close{width:38px;height:38px;border-radius:11px;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;margin-inline-start:auto;flex-shrink:0;transition:background .15s,color .15s;}
+.pf-close{width:38px;height:38px;border-radius:11px;border:none;background:var(--bg);color:var(--text-muted);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.95rem;flex-shrink:0;transition:background .15s,color .15s;}
 .pf-close:hover{background:#fef2f2;color:#dc2626;}
 .pf-id{flex:1;min-width:0;padding-bottom:2px;}
 .pf-name{font-weight:800;font-size:1.35rem;color:var(--text);letter-spacing:-.2px;display:flex;align-items:center;gap:9px;flex-wrap:wrap;line-height:1.25;}
@@ -2497,12 +2497,15 @@
 .pf-pill .dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;}
 
 /* بطاقات المعلومات */
-.pf-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:11px;}
-.pf-tile{background:var(--bg);border:1.5px solid var(--border);border-radius:12px;padding:12px 13px;display:flex;flex-direction:column;gap:3px;min-width:0;}
-.pf-tile .lab{font-size:.7rem;color:var(--text-muted);font-weight:700;display:flex;align-items:center;gap:6px;}
+/* معلومات المريض: أسطر لا صناديق — مطابقة لتطبيق الطبيب */
+.pf-tiles{display:flex;flex-direction:column;gap:0;}
+.pf-tile{background:transparent;border:none;border-bottom:1px solid var(--border);border-radius:0;padding:9px 2px;display:flex;align-items:baseline;justify-content:space-between;gap:14px;min-width:0;}
+.pf-tile:last-child{border-bottom:none;}
+.pf-tile .lab{font-size:.76rem;color:var(--text-muted);font-weight:600;display:flex;align-items:center;gap:6px;flex-shrink:0;}
 .pf-tile .lab i{font-size:.72rem;opacity:.85;width:13px;text-align:center;}
-.pf-tile .val{font-size:.95rem;font-weight:800;color:var(--text);word-break:break-word;overflow-wrap:anywhere;}
-.pf-tile.full{grid-column:1/-1;}
+.pf-tile .val{font-size:.88rem;font-weight:700;color:var(--text);word-break:break-word;overflow-wrap:anywhere;text-align:end;}
+.pf-tile.full{flex-direction:column;align-items:stretch;gap:4px;}
+.pf-tile.full .val{text-align:start;}
 .pf-alert{grid-column:1/-1;display:flex;gap:11px;align-items:flex-start;background:rgba(245,158,11,.12);border:1.5px solid rgba(245,158,11,.4);border-radius:12px;padding:11px 13px;}
 .pf-alert .ic{width:32px;height:32px;border-radius:9px;background:rgba(245,158,11,.2);color:#f59e0b;display:flex;align-items:center;justify-content:center;flex-shrink:0;}
 .pf-alert .t{font-size:.76rem;font-weight:800;color:#f59e0b;}

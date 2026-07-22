@@ -857,6 +857,12 @@
             <h3 id="modalPatientName" class="pf-name">-</h3>
             <p id="modalPatientPhone" class="pf-phone" dir="ltr"></p>
           </div>
+          <!-- إجراءات على المريض — نُقلت من بطاقة الأرشيف إلى جوار اسمه -->
+          <div class="pf-head-actions">
+            <a id="modalWhatsappBtn" href="#" target="_blank" class="pf-actbtn wa" title="واتساب"><i class="fab fa-whatsapp"></i></a>
+            <a id="modalCallBtn" href="#" class="pf-actbtn" title="اتصال"><i class="fas fa-phone"></i></a>
+            <button onclick="printPatientChart(document.getElementById('patientDetailsModal').dataset.patientId)" class="pf-actbtn" title="طباعة الإضبارة (PDF)"><i class="fas fa-print"></i></button>
+          </div>
           <button id="closePatientDetailsModalBtn" onclick="closePatientDetailsModal()" class="pf-close" title="إغلاق"><i class="fas fa-times"></i></button>
         </div>
         <div id="chartHeaderPills" class="pf-pills"></div>
@@ -879,11 +885,7 @@
             <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;">
               <h4 style="font-weight:800;font-size:.9rem;color:var(--primary);margin:0;"><i class="fas fa-folder-open" style="margin-left:6px;"></i>أرشيف الزيارات <span id="chartVisitsCount" style="font-size:.72rem;color:var(--text-muted);font-weight:600;"></span></h4>
               <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center;">
-                <div class="pf-head-actions">
-                  <a id="modalWhatsappBtn" href="#" target="_blank" class="pf-actbtn wa" title="واتساب"><i class="fab fa-whatsapp"></i></a>
-                  <a id="modalCallBtn" href="#" class="pf-actbtn" title="اتصال"><i class="fas fa-phone"></i></a>
-                  <button onclick="printPatientChart(document.getElementById('patientDetailsModal').dataset.patientId)" class="pf-actbtn" title="طباعة الإضبارة (PDF)"><i class="fas fa-print"></i></button>
-                </div>
+                
                 <button onclick="openAddVisitModalFromModal()" class="btn-primary" style="padding:7px 14px;font-size:.8rem;"><i class="fas fa-plus"></i> زيارة جديدة</button>
               </div>
             </div>
@@ -1838,7 +1840,7 @@
   </div>
 
   <script src="config.js"></script>
-  <script src="script.js?v=53"></script>
+  <script src="script.js?v=54"></script>
   <script>
     function copyPhone(btn) {
       navigator.clipboard.writeText('+491773052955').then(function() {
